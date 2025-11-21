@@ -52,7 +52,7 @@ FoodGuard is a comprehensive web application that helps users stay informed abou
 
 ## Installation & Setup
 
-1. Clone the repository:  bash git clone https://github.com/WinnieYuDev/binary-upload-boom
+1. Clone the repository:  bash git clone https://github.com/WinnieYuDev/food-guard-mvc-demo
 
 2. Install modules `npm install`
 
@@ -68,11 +68,7 @@ FoodGuard is a comprehensive web application that helps users stay informed abou
   - ClOUNDINARY_API_SECRET = `your cloudinary api secret`
   - NODE_ENV=development
 
----
-
-# Run
-
-`npm start`
+3. Run using `npm start`
 
 ## Examples:
 Feel free to take a look at other fullstack applications I worked on:
