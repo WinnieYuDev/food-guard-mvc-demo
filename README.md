@@ -2,6 +2,8 @@
 
 FoodGuard is a comprehensive web application that helps users stay informed about food recalls, safety alerts, and product information. It integrates real-time data from multiple food safety APIs to provide up-to-date information about food recalls and product safety.
 
+![alt text](/public/imgs/website.jpg)
+
 ## Features
 
 ### User Authentication
