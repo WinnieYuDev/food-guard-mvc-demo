@@ -1,0 +1,16 @@
+# Don't upload these to GitHub - keep them local
+
+# Node modules - we can reinstall these with npm install
+node_modules/
+
+# Environment variables - contains secrets!
+.env
+
+# System files
+.DS_Store
+
+# Uploaded files
+/public/uploads/
+
+# Log files
+*.log

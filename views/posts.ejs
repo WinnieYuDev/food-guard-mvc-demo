@@ -1,0 +1,185 @@
+<%- include('partials/header') %>
+
+<main class="max-w-6xl mx-auto py-6 px-4">
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Community Forum</h1>
+        <p class="text-gray-600 mt-2">Discuss food safety, share tips, and ask questions with the community.</p>
+    </div>
+
+    <!-- Create Post Form -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Create New Post</h2>
+        <form action="/posts" method="POST" enctype="multipart/form-data">
+            <div class="space-y-4">
+                <!-- Title Input -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                    <input type="text" name="title" required 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-usda-blue focus:border-transparent"
+                           placeholder="What would you like to discuss?">
+                </div>
+                
+                <!-- Category Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                    <select name="category" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-usda-blue focus:border-transparent">
+                        <option value="general">General Discussion</option>
+                        <option value="safety-tips">Safety Tips</option>
+                        <option value="recall-discussion">Recall Discussion</option>
+                        <option value="questions">Questions</option>
+                    </select>
+                </div>
+                
+                <!-- Content Textarea -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Content</label>
+                    <textarea name="content" rows="4" required
+                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-usda-blue focus:border-transparent"
+                              placeholder="Share your thoughts, questions, or experiences..."></textarea>
+                </div>
+                
+                <!-- Image Upload -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Image (Optional)</label>
+                    <input type="file" name="image" accept="image/*"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-usda-blue">
+                    <input type="text" name="imageCaption" 
+                           class="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-usda-blue"
+                           placeholder="Image caption (optional)">
+                </div>
+                
+                <!-- Submit Button -->
+                <button type="submit" class="bg-usda-blue hover:bg-usda-darkblue text-white px-6 py-2 rounded-md font-medium transition-colors">
+                    Create Post
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Posts List -->
+    <div class="space-y-6">
+        <% if (posts.length > 0) { %>
+            <% posts.forEach(post => { %>
+                <div class="bg-white rounded-lg shadow-md p-6 border border-gray-200 hover:shadow-lg transition-shadow">
+                    <!-- Post Header with Author Info -->
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <!-- Author Avatar -->
+                            <div class="w-10 h-10 bg-usda-blue rounded-full flex items-center justify-center">
+                                <span class="text-white text-sm font-medium">
+                                    <%= post.author.username.charAt(0).toUpperCase() %>
+                                </span>
+                            </div>
+                            <div>
+                                <div class="font-semibold text-gray-900"><%= post.author.username %></div>
+                                <div class="text-sm text-gray-500">
+                                    <%= new Date(post.createdAt).toLocaleDateString() %>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Category Badge -->
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium 
+                            <%= post.category === 'recall-discussion' ? 'bg-red-100 text-red-800' :
+                               post.category === 'safety-tips' ? 'bg-green-100 text-green-800' :
+                               'bg-blue-100 text-blue-800' %>">
+                            <%= post.category.replace('-', ' ') %>
+                        </span>
+                    </div>
+                    
+                    <!-- Post Title and Content Preview -->
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">
+                        <a href="/posts/<%= post._id %>" class="hover:text-usda-blue transition-colors">
+                            <%= post.title %>
+                        </a>
+                    </h3>
+                    
+                    <!-- Content Preview (first 200 characters) -->
+                    <p class="text-gray-700 mb-4 line-clamp-3">
+                        <%= post.content.length > 200 ? post.content.substring(0, 200) + '...' : post.content %>
+                    </p>
+                    
+                    <!-- Post Image Preview -->
+                    <% if (post.image && post.image.url) { %>
+                        <div class="mb-4">
+                            <img src="<%= post.image.url %>" alt="Post image" 
+                                 class="rounded-lg max-w-xs h-32 object-cover border border-gray-200">
+                        </div>
+                    <% } %>
+                    
+                    <!-- Post Actions (Likes, Comments, Delete) -->
+                    <div class="flex items-center justify-between pt-4 border-t border-gray-200">
+                        <div class="flex items-center space-x-6">
+                            <!-- Like Button -->
+                            <form action="/posts/<%= post._id %>/like" method="POST" class="inline">
+                                <button type="submit" class="flex items-center space-x-2 text-gray-600 hover:text-usda-blue transition-colors">
+                                    <span class="text-lg">👍</span>
+                                    <span class="text-sm font-medium"><%= post.likes %></span>
+                                    <span class="text-sm">Likes</span>
+                                </button>
+                            </form>
+                            
+                            <!-- Comment Link -->
+                            <a href="/posts/<%= post._id %>" class="flex items-center space-x-2 text-gray-600 hover:text-usda-blue transition-colors">
+                                <span class="text-lg">💬</span>
+                                <span class="text-sm font-medium"><%= post.comments.length %></span>
+                                <span class="text-sm">Comments</span>
+                            </a>
+                        </div>
+                        
+                        <!-- Delete Button (only show for post author) -->
+                        <% if (user && post.author._id.toString() === user.id) { %>
+                            <form action="/posts/<%= post._id %>/delete" method="POST" class="inline">
+                                <button type="submit" 
+                                        onclick="return confirm('Are you sure you want to delete this post? This action cannot be undone.')"
+                                        class="text-red-600 hover:text-red-800 text-sm font-medium transition-colors">
+                                    Delete Post
+                                </button>
+                            </form>
+                        <% } %>
+                    </div>
+                </div>
+            <% }); %>
+        <% } else { %>
+            <!-- No Posts Message -->
+            <div class="bg-white rounded-lg shadow-md p-8 text-center border border-gray-200">
+                <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span class="text-2xl text-gray-400">💬</span>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">No Posts Yet</h3>
+                <p class="text-gray-600">Be the first to start a discussion! Share your food safety tips or questions.</p>
+            </div>
+        <% } %>
+    </div>
+
+    <!-- Pagination -->
+    <% if (pagination.totalPages > 1) { %>
+        <div class="mt-8 flex justify-center space-x-2">
+            <!-- Previous Page -->
+            <% if (pagination.hasPrev) { %>
+                <a href="?page=<%= pagination.page - 1 %>" 
+                   class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                    ← Previous
+                </a>
+            <% } %>
+            
+            <!-- Page Numbers -->
+            <% for (let i = 1; i <= pagination.totalPages; i++) { %>
+                <a href="?page=<%= i %>" 
+                   class="px-4 py-2 border <%= i === pagination.page ? 'border-usda-blue bg-usda-blue text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50' %> rounded-md text-sm font-medium transition-colors">
+                    <%= i %>
+                </a>
+            <% } %>
+            
+            <!-- Next Page -->
+            <% if (pagination.hasNext) { %>
+                <a href="?page=<%= pagination.page + 1 %>" 
+                   class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                    Next →
+                </a>
+            <% } %>
+        </div>
+    <% } %>
+</main>
+
+<%- include('partials/footer') %>
