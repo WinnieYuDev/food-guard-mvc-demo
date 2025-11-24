@@ -122,10 +122,10 @@ const startServer = async () => {
     
   } catch (error) {
     console.error('='.repeat(50));
-    console.error('❌ FAILED TO START SERVER');
+    console.error('FAILED TO START SERVER');
     console.error('='.repeat(50));
     console.error('Error:', error.message);
-    console.log('\n💡 TROUBLESHOOTING STEPS:');
+    console.log('\nTROUBLESHOOTING STEPS:');
     console.log('1. Check if MongoDB is running');
     console.log('2. Verify MONGODB_URI in .env file');
     console.log('3. Check your internet connection (if using MongoDB Atlas)');
