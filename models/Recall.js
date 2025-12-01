@@ -80,6 +80,10 @@ const recallSchema = new mongoose.Schema({
     ],
     required: true
   },
+  // Tags: array of short keywords inferred from product/title/description
+  tags: [{
+    type: String
+  }],
   // Retailer where product was sold (if known)
   retailer: {
     type: String,

@@ -1043,6 +1043,32 @@ exports.normalizeRecallData = (recall) => {
   // Use a simple hyphen separator and preserve the cleaned text casing.
   let finalTitle = titleParts.length > 0 ? titleParts.join(' - ') : (recall.title || 'Product Recall');
 
+  // Generate simple tags for searches and filtering. Include inferred
+  // category and detected food keywords and notable pathogens.
+  const tagSet = new Set();
+  if (recall && recall.category) tagSet.add(String(recall.category).toLowerCase());
+  const combinedForTags = `${cleanedProduct} ${finalTitle} ${(recall.description || '')}`.toLowerCase();
+  const keywordTags = [
+    'egg','eggs','milk','cheese','yogurt','butter',
+    'chicken','turkey','beef','pork','fish','shrimp','shellfish',
+    'spinach','lettuce','broccoli','tomato','onion','apple','banana','mango','grape',
+    'peanut','almond','cashew','walnut','pistachio','hazelnut',
+    'bread','flour','pasta','noodle','rice','cereal',
+    'cookie','candy','chocolate','snack','popcorn',
+    'baby','infant'
+  ];
+  for (const kw of keywordTags) {
+    if (combinedForTags.includes(kw)) tagSet.add(kw);
+  }
+  // detect common pathogens/contaminants
+  const reasonText = (recall.reason || recall.reason_for_recall || '').toString().toLowerCase();
+  const pathogenTags = ['salmonella','listeria','e coli','e.coli','norovirus','metal','glass','allergen','undeclared'];
+  for (const p of pathogenTags) {
+    if (reasonText.includes(p) || combinedForTags.includes(p)) tagSet.add(p.replace(/\./g,'').replace(/\s+/g,'-'));
+  }
+
+  const tagsArray = Array.from(tagSet);
+
   return {
     _id: recall._id,
     recallId: recall.recallId || recall.recall_number || `RECALL-${Date.now()}`,
@@ -1108,6 +1134,7 @@ exports.normalizeRecallData = (recall) => {
 
       return 'other';
     })(),
+    tags: tagsArray,
     riskLevel: recall.riskLevel || 'medium',
     retailer: retailerSlug,
     
@@ -1206,7 +1233,8 @@ exports.reNormalizeAllRecalls = async () => {
             brand: normalized.brand,
             description: normalized.description,
             reason: normalized.reason,
-            category: normalized.category
+            category: normalized.category,
+            tags: normalized.tags || []
           }}
         );
         
