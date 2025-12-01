@@ -1,72 +1,69 @@
 const mongoose = require('mongoose');
 
-// Define what a Food Recall looks like in our database
 const recallSchema = new mongoose.Schema({
   recallId: {
     type: String,
     required: true,
-    unique: true // Each recall has unique ID
+    unique: true
   },
   title: {
     type: String,
-    required: true,
-    trim: true
+    required: true
   },
   description: {
     type: String,
     required: true
   },
+  brand: {
+    type: String,
+    required: true
+  },
+  product: {
+    type: String,
+    required: true
+  },
+  category: {
+    type: String,
+    required: true,
+    enum: ['poultry', 'vegetables', 'shellfish', 'meat', 'dairy', 'grains', 'fruits', 'processed-foods', 'beverages', 'other']
+  },
+  retailer: {
+    type: String,
+    required: true,
+    enum: ['trader-joes', 'whole-foods', 'kroger', 'walmart', 'target', 'costco', 'safeway', 'albertsons', 'publix', 'wegmans', 'other']
+  },
   reason: {
     type: String,
-    required: true // Why was this product recalled?
+    required: true
   },
   riskLevel: {
     type: String,
-    enum: ['High', 'Medium', 'Low'], // Only these values allowed
-    default: 'Medium'
+    required: true,
+    enum: ['high', 'medium', 'low']
   },
-  date: {
+  recallDate: {
     type: Date,
-    required: true // When was recall announced?
+    required: true
   },
-  products: [{
-    name: String,
-    barcode: String,
-    brand: String,
-    image: String, // Product photo
-    allergens: [String], // List of allergens
-    ingredients: String, // Product ingredients
-    nutritionFacts: {
-      calories: Number,
-      protein: Number,
-      carbs: Number,
-      fat: Number
-    }
+  statesAffected: [String],
+  images: [{
+    url: String,
+    caption: String
   }],
   source: {
     type: String,
-    enum: ['FSIS', 'FDA', 'Manual'], // Where recall info came from
-    required: true
+    default: 'FDA'
   },
-  status: {
-    type: String,
-    enum: ['Active', 'Resolved'],
-    default: 'Active'
-  },
-  images: [{
-    url: String,
-    cloudinaryId: String, // For image deletion
-    caption: String
-  }]
-}, { 
-  // Automatically add createdAt and updatedAt fields
-  timestamps: true 
+  isActive: {
+    type: Boolean,
+    default: true
+  }
+}, {
+  timestamps: true
 });
 
-// Create indexes for faster searches
-recallSchema.index({ status: 1, date: -1 }); // Active recalls, newest first
-recallSchema.index({ riskLevel: 1 }); // Search by risk level
+// Index for better search performance
+recallSchema.index({ title: 'text', description: 'text', product: 'text', brand: 'text' });
+recallSchema.index({ category: 1, retailer: 1, riskLevel: 1 });
 
-// Create Recall model from schema
-// This creates a "recalls" collection in MongoDB
 module.exports = mongoose.model('Recall', recallSchema);
