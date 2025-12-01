@@ -1,34 +1,90 @@
 const express = require('express');
 const router = express.Router();
 const recallsController = require('../controllers/recalls');
-const { seedDatabase } = require('../utils/seedRecalls'); // Make sure this path is correct
 
-// Main recalls page
+// Debug: Check if controller functions exist
+console.log('🔍 Recalls controller loaded:', {
+  getRecalls: typeof recallsController.getRecalls,
+  getRecall: typeof recallsController.getRecall,
+  lookupProduct: typeof recallsController.lookupProduct,
+  apiGetRecalls: typeof recallsController.apiGetRecalls
+});
+
+// Main recalls page - uses live API data only
 router.get('/', recallsController.getRecalls);
 
-// Single recall detail page
+// Single recall detail page - uses live API data
 router.get('/:id', recallsController.getRecall);
 
-// Product lookup API endpoint
+// Product lookup API endpoint - uses live API search
 router.post('/lookup', recallsController.lookupProduct);
 
-// External API endpoint
+// External API endpoint - returns live API data
 router.get('/api/recalls', recallsController.apiGetRecalls);
 
-// Add this route for seeding (remove in production)
-router.get('/seed/recalls', async (req, res) => {
-  if (process.env.NODE_ENV === 'production') {
-    return res.status(403).json({ error: 'Not allowed in production' });
-  }
-  
+// Debug route to test APIs directly
+router.get('/debug/apis', async (req, res) => {
   try {
-    const count = await seedDatabase();
-    res.json({ 
-      success: true, 
-      message: `Successfully seeded ${count} recalls`,
-      recalls: count
+    const recallApiService = require('../services/recallAPI');
+    const axios = require('axios');
+    
+    console.log('🧪 Testing government APIs...');
+    
+    // Test FDA API
+    let fdaStatus = 'unknown';
+    let fdaCount = 0;
+    try {
+      const fdaResponse = await axios.get('https://api.fda.gov/food/enforcement.json?limit=5', {
+        timeout: 10000
+      });
+      fdaStatus = 'working';
+      fdaCount = fdaResponse.data.results?.length || 0;
+      console.log('✅ FDA API working:', fdaCount, 'recalls');
+    } catch (fdaError) {
+      fdaStatus = 'failed: ' + fdaError.message;
+      console.log('❌ FDA API failed:', fdaError.message);
+    }
+    
+    // Test FSIS API
+    let fsisStatus = 'unknown';
+    let fsisCount = 0;
+    try {
+      const fsisResponse = await axios.get('https://www.fsis.usda.gov/fsis/api/recall/v1/recalls', {
+        timeout: 15000
+      });
+      fsisStatus = 'working';
+      fsisCount = Array.isArray(fsisResponse.data) ? fsisResponse.data.length : 'unknown';
+      console.log('✅ FSIS API working:', fsisCount, 'recalls');
+    } catch (fsisError) {
+      fsisStatus = 'failed: ' + fsisError.message;
+      console.log('❌ FSIS API failed:', fsisError.message);
+    }
+    
+    // Test our recall service
+    let serviceStatus = 'unknown';
+    let serviceCount = 0;
+    try {
+      const recalls = await recallApiService.fetchAllRecalls({ limit: 10 });
+      serviceStatus = 'working';
+      serviceCount = recalls.length;
+      console.log('✅ Recall service working:', serviceCount, 'recalls');
+    } catch (serviceError) {
+      serviceStatus = 'failed: ' + serviceError.message;
+      console.log('❌ Recall service failed:', serviceError.message);
+    }
+    
+    res.json({
+      success: true,
+      apis: {
+        fda: { status: fdaStatus, recalls: fdaCount },
+        fsis: { status: fsisStatus, recalls: fsisCount },
+        service: { status: serviceStatus, recalls: serviceCount }
+      },
+      timestamp: new Date().toISOString()
     });
+    
   } catch (error) {
+    console.error('Debug route error:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -36,29 +92,35 @@ router.get('/seed/recalls', async (req, res) => {
   }
 });
 
-// Debug route to check retailers in database
-router.get('/debug/retailers', async (req, res) => {
+// Debug route to check current recalls
+router.get('/debug/current', async (req, res) => {
   try {
-    const Recall = require('../models/Recall');
-    const retailers = await Recall.aggregate([
-      { $match: { isActive: true } },
-      { $group: { 
-        _id: '$retailer', 
-        count: { $sum: 1 },
-        examples: { $push: { title: '$title', id: '$_id' } }
-      }},
-      { $sort: { _id: 1 } }
-    ]);
+    const recallApiService = require('../services/recallAPI');
+    
+    console.log('🔍 Fetching current recalls from APIs...');
+    const recalls = await recallApiService.fetchAllRecalls({ limit: 20 });
     
     res.json({
       success: true,
-      retailers: retailers,
-      totalRecalls: retailers.reduce((sum, r) => sum + r.count, 0)
+      recalls: recalls.map(recall => ({
+        id: recall.recallId,
+        title: recall.title,
+        product: recall.product,
+        brand: recall.brand,
+        agency: recall.agency,
+        date: recall.recallDate,
+        risk: recall.riskLevel,
+        source: recall.source
+      })),
+      total: recalls.length,
+      timestamp: new Date().toISOString()
     });
+    
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
+    console.error('Debug current error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
     });
   }
 });
