@@ -234,7 +234,15 @@ exports.getHome = async (req, res) => {
                     
                     const category = normalizedRecall.category || 'other';
 
-                    const cleanedTitle = normalizedRecall.title || normalizedRecall.product || '';
+                                        const junkProductPattern = /^\s*$|^[\d\-\/\s,:]+$/;
+                                        let cleanedTitle = '';
+                                        if (normalizedRecall.product && !junkProductPattern.test(normalizedRecall.product) && normalizedRecall.product !== 'Unknown Product') {
+                                            cleanedTitle = (normalizedRecall.product + (normalizedRecall.brand ? ` - ${normalizedRecall.brand}` : '')).trim();
+                                        } else if (normalizedRecall.title && !junkProductPattern.test(normalizedRecall.title) && String(normalizedRecall.title).split(' - ')[0].trim().length > 2) {
+                                            cleanedTitle = normalizedRecall.title;
+                                        } else {
+                                            cleanedTitle = normalizedRecall.brand || normalizedRecall.title || 'Product Recall';
+                                        }
                     const cleanedReason = sanitizeReason(normalizedRecall.reason || normalizedRecall.description || '', cleanedTitle);
 
                     let locations = '';

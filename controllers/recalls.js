@@ -30,6 +30,8 @@ const cleanBrandName = (brandText) => {
   cleaned = cleaned.replace(/,?\s*\d+\s+[A-Za-z\s]+(?:Ave|Avenue|St|Street|Rd|Road|Blvd|Boulevard|Dr|Drive|Ln|Lane|Way|Court|Ct|Place|Pl)\.?[,\s]*/gi, '');
   cleaned = cleaned.replace(/,?\s*[A-Z][a-z]+,\s*[A-Z]{2}\s*\d{5}(-\d{4})?/g, ''); // City, ST 12345
   cleaned = cleaned.replace(/,?\s*[A-Z]{2}\s*\d{5}(-\d{4})?/g, ''); // ST 12345
+  // Remove "DBA" or "d/b/a" and anything after it (we want the company name)
+  cleaned = cleaned.replace(/\s+(?:d\/b\/a|dba)(?:\s+.*)?$/i, '');
   
   if (cleaned.includes(',')) {
     cleaned = cleaned.split(',')[0].trim();
@@ -52,6 +54,30 @@ const cleanBrandName = (brandText) => {
   }
   
   cleaned = cleaned.trim();
+
+  // Normalize casing: title-case most words but keep corporate suffixes uppercase
+  const suffixPattern = /\b(Inc|LLC|Corp|Corporation|Co|Company|Ltd|Limited)\.?$/i;
+  let suffixMatch = cleaned.match(suffixPattern);
+  let suffix = '';
+  if (suffixMatch) {
+    suffix = suffixMatch[1].toUpperCase();
+    cleaned = cleaned.replace(suffixPattern, '').trim();
+  }
+
+  // Title case remaining words
+  cleaned = cleaned.split(/\s+/).map(w => {
+    const lower = w.toLowerCase();
+    if (['and','of','the','&','for','in','at','by','llc','inc','co','corp','ltd'].includes(lower)) {
+      // keep short words lowercase or handled as suffixes
+      return (w.length <= 2) ? w.toUpperCase() : (w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+    }
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  }).join(' ');
+
+  if (suffix) {
+    cleaned = `${cleaned}, ${suffix}.`;
+  }
+
   return cleaned || 'Unknown Brand';
 };
 
@@ -950,97 +976,72 @@ exports.normalizeRecallData = (recall) => {
   const allowedRetailers = ['trader-joes','whole-foods','kroger','walmart','costco','target','safeway','albertsons','various-retailers'];
   if (!allowedRetailers.includes(retailerSlug)) retailerSlug = 'various-retailers';
 
-  const rawProduct = (recall.product || recall.product_description || recall.title || '').toString();
-  const rawBrand = (recall.brand || recall.recalling_firm || recall.Firm || '').toString();
-  
+  // Prefer explicit API fields when present (some feeds include
+  // `product_description` and `brand_names`/`brand_name`). For lookup
+  // results we want to display `product_description - brand` instead of
+  // trying to parse the announcement title.
+  let rawProduct = (recall.product || recall.product_description || recall.title || '').toString();
+  let rawBrand = (recall.brand || recall.recalling_firm || recall.Firm || '').toString();
+
+  // Check common API/rawData shapes for brand_names (array) + product_description
+  let apiProductDesc = null;
+  let apiBrandName = null;
+  if (Array.isArray(recall.brand_names) && recall.product_description) {
+    apiProductDesc = String(recall.product_description);
+    apiBrandName = String(recall.brand_names[0] || '').trim();
+  } else if (recall.brand_name && recall.product_description) {
+    apiProductDesc = String(recall.product_description);
+    apiBrandName = String(recall.brand_name).trim();
+  } else if (recall.rawData) {
+    const rd = recall.rawData;
+    if (Array.isArray(rd.brand_names) && rd.product_description) {
+      apiProductDesc = String(rd.product_description);
+      apiBrandName = String(rd.brand_names[0] || '').trim();
+    } else if (rd.brand_name && rd.product_description) {
+      apiProductDesc = String(rd.product_description);
+      apiBrandName = String(rd.brand_name).trim();
+    }
+  }
+
+  if (apiProductDesc) {
+    rawProduct = apiProductDesc;
+    if (apiBrandName && apiBrandName.length > 0) rawBrand = apiBrandName;
+  }
+
   let cleanedProduct = cleanProductTitle(rawProduct);
   let cleanedBrand = cleanBrandName(rawBrand);
+
+  // If the cleaned product looks like garbage (e.g. just sizes like "6/" or
+  // small numeric tokens), try fallbacks from API-specific fields
+  const junkProductPattern = /^\s*$|^[\d\-\/\s,:]+$/;
+  if (!cleanedProduct || cleanedProduct === 'Unknown Product' || cleanedProduct.length < 3 || junkProductPattern.test(cleanedProduct)) {
+    const fallbackCandidates = [];
+    if (recall.product_description) fallbackCandidates.push(String(recall.product_description));
+    if (recall.rawData && recall.rawData.product_description) fallbackCandidates.push(String(recall.rawData.product_description));
+    if (recall.Product) fallbackCandidates.push(String(recall.Product));
+    if (recall.field_title) fallbackCandidates.push(String(recall.field_title));
+    if (recall.title) fallbackCandidates.push(String(recall.title));
+
+    for (const cand of fallbackCandidates) {
+      if (cand && String(cand).trim().length > 3 && !junkProductPattern.test(cand)) {
+        cleanedProduct = cleanProductTitle(cand);
+        break;
+      }
+    }
+  }
   
   const productLower = cleanedProduct.toLowerCase();
   const brandLower = cleanedBrand.toLowerCase();
   
-  const allCapsBrandPattern = /^([A-Z][A-Z\s]+?)\s+-\s+/;  // Matches "SILVER HORSE - "
-  const titleCaseBrandPattern = /^([A-Z][a-z]+\s+[A-Z][a-z]+)\s+/;
-  
-  let extractedBrand = null;
-  
-  let brandMatch = cleanedProduct.match(allCapsBrandPattern);
-  if (brandMatch) {
-    extractedBrand = brandMatch[1].trim();
-    cleanedProduct = cleanedProduct.substring(brandMatch[0].length).trim();
-    if (brandLower.includes('inc') || brandLower.includes('llc') || brandLower.includes('group') || brandLower.includes('corp')) {
-      cleanedBrand = extractedBrand;
-    }
-  } else {
-    brandMatch = cleanedProduct.match(titleCaseBrandPattern);
-    if (brandMatch) {
-      const potentialBrand = brandMatch[1];
-      const knownBrands = ['cabot creamery', 'kraft foods', 'nestle', 'general mills', 'quaker oats', 'pepperidge farm', 'tyson foods', 'echo lake'];
-      const potLower = potentialBrand.toLowerCase();
-      
-      if (knownBrands.some(kb => potLower === kb || potLower.startsWith(kb))) {
-        extractedBrand = potentialBrand;
-        cleanedProduct = cleanedProduct.substring(potentialBrand.length).trim();
-        if (brandLower.includes('inc') || brandLower.includes('llc') || brandLower.includes('foods') || brandLower.includes('jody')) {
-          cleanedBrand = extractedBrand;
-        }
-      }
-    }
-  }
-  
-  if (!extractedBrand && brandLower !== 'unknown brand') {
-    const brandWords = cleanedBrand.split(/\s+/).filter(w => w.length > 2);
-    if (brandWords.length > 0 && productLower.startsWith(brandWords[0].toLowerCase())) {
-      let matchedChars = 0;
-      let matchedWords = 0;
-      for (const word of brandWords) {
-        const regex = new RegExp(`^${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*`, 'i');
-        const remaining = cleanedProduct.substring(matchedChars);
-        const match = remaining.match(regex);
-        if (match) {
-          matchedChars += match[0].length;
-          matchedWords++;
-        } else {
-          break;
-        }
-      }
-      if (matchedWords >= Math.min(2, brandWords.length)) {
-        cleanedProduct = cleanedProduct.substring(matchedChars).trim();
-      }
-    }
-  }
+  // Keep product description and brand as cleaned by their helpers.
+  // Do not attempt to extract or strip brand names from the product text —
+  // we want the display title to be `Product Description - Brand`.
   
   const titleParts = [];
   if (cleanedProduct && cleanedProduct !== 'Unknown Product') titleParts.push(cleanedProduct);
   if (cleanedBrand && cleanedBrand !== 'Unknown Brand' && cleanedBrand !== cleanedProduct) titleParts.push(cleanedBrand);
-  let finalTitle = titleParts.length > 0 ? titleParts.join(' — ') : (recall.title || 'Product Recall');
-  
-  finalTitle = finalTitle
-    .split(' ')
-    .map((word, index) => {
-      const cleanWord = word.replace(/[,\.;:!?]$/g, '');
-      const punctuation = word.slice(cleanWord.length);
-      
-      const lowercaseWords = ['a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'from', 'in', 'into', 'of', 'on', 'or', 'the', 'to', 'with', 'per', 'dz'];
-      if (index > 0 && lowercaseWords.includes(cleanWord.toLowerCase())) {
-        return cleanWord.toLowerCase() + punctuation;
-      }
-      
-      if (cleanWord === cleanWord.toUpperCase() && cleanWord.length >= 2 && cleanWord.length <= 3 && /^[A-Z]+$/.test(cleanWord) && !lowercaseWords.includes(cleanWord.toLowerCase())) {
-        return word;
-      }
-      
-      if (cleanWord.includes("'") || cleanWord.includes("'")) {
-        return cleanWord.split(/([''])/).map((part, i) => {
-          if (part === "'" || part === "'") return part;
-          if (i === 0) return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
-          return part.toLowerCase();
-        }).join('') + punctuation;
-      }
-      
-      return cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1).toLowerCase() + punctuation;
-    })
-    .join(' ');
+  // Use a simple hyphen separator and preserve the cleaned text casing.
+  let finalTitle = titleParts.length > 0 ? titleParts.join(' - ') : (recall.title || 'Product Recall');
 
   return {
     _id: recall._id,
@@ -1053,7 +1054,23 @@ exports.normalizeRecallData = (recall) => {
     reason: recall.reason || recall.reason_for_recall || 'Not specified',
     
     category: (() => {
-      const allowed = ['poultry','beef','pork','seafood','vegetables','fruits','dairy','eggs','nuts','grains','snacks','baby-food','other'];
+      // Align allowed categories with the Mongoose schema in models/Recall.js
+      const allowed = [
+        'poultry',
+        'vegetables',
+        'shellfish',
+        'meat',
+        'dairy',
+        'fruits',
+        'eggs',
+        'grains',
+        'processed-foods',
+        'beverages',
+        'snacks',
+        'breakfast',
+        'baby-food',
+        'other'
+      ];
 
       if (isNonFoodItem(cleanedProduct, finalTitle)) {
         return 'other';
@@ -1074,9 +1091,9 @@ exports.normalizeRecallData = (recall) => {
       if (!inferred) {
         if (/\bmilk\b|\bcheese\b|\byogurt\b|\bdairy\b/i.test(combined)) inferred = 'dairy';
         else if (/\bchicken\b|\bturkey\b|\bpoultry\b/i.test(combined)) inferred = 'poultry';
-        else if (/\bbeef\b|\bsteak\b/i.test(combined)) inferred = 'beef';
-        else if (/\bpork\b|\bbacon\b|\bsausage\b/i.test(combined)) inferred = 'pork';
-        else if (/\bfish\b|\bshrimp\b|\bseafood\b|\bsalmon\b/i.test(combined)) inferred = 'seafood';
+        else if (/\bbeef\b|\bsteak\b/i.test(combined)) inferred = 'meat';
+        else if (/\bpork\b|\bbacon\b|\bsausage\b/i.test(combined)) inferred = 'meat';
+        else if (/\bfish\b|\bshrimp\b|\bseafood\b|\bsalmon\b/i.test(combined)) inferred = 'shellfish';
         else if (/\bfruit\b|\bapple\b|\borange\b|\bberry\b|\bmelon\b|\bcantaloupe\b|\bhoneydew\b|\bwatermelon\b/i.test(combined)) inferred = 'fruits';
         else if (/\bvegetable\b|\blettuce\b|\bspinach\b|\bsalad\b|\bonion\b|\bgreen\s+onion\b|\bscallion\b|\bspring\s+onion\b/i.test(combined)) inferred = 'vegetables';
         else if (/\bbread\b|\bgrain\b/i.test(combined)) inferred = 'grains';
@@ -1095,7 +1112,13 @@ exports.normalizeRecallData = (recall) => {
     retailer: retailerSlug,
     
     agency: recall.agency || 'FDA',
-    status: recall.status || 'Ongoing',
+    status: (() => {
+      const rawStatus = (recall.status || recall.Status || (recall.rawData && (recall.rawData.status || recall.rawData.recall_status)) || 'Ongoing').toString();
+      const s = rawStatus.trim().toLowerCase();
+      if (s === 'terminated' || s === 'completed' || s === 'closed') return 'Completed';
+      if (s === 'pending') return 'Pending';
+      return 'Ongoing';
+    })(),
     source: recall.source || 'database',
     
     distribution: recall.distribution || recall.distribution_pattern || 'Nationwide',
