@@ -17,6 +17,7 @@ const Recall = require('../models/Recall');
 const recallApiService = require('../services/recallAPI');
 const axios = require('axios');
 const https = require('https');
+const dev = process.env.NODE_ENV === 'development';
 
 // === Helpers: Text normalization ===
 // Functions that clean and normalize free-form text fields (brand, product)
@@ -227,7 +228,7 @@ const fetchJson = (url, timeout = 8000) => new Promise((resolve, reject) => {
 // or return JSON for API consumers.
 exports.getRecalls = async (req, res) => {
   try {
-    console.log('Query parameters:', req.query);
+    
 
     const page = parseInt(req.query.page) || 1;
     const limit = 12;
@@ -275,7 +276,7 @@ exports.getRecalls = async (req, res) => {
       let apiRecalls = await Promise.race([apiPromise, timeoutPromise]);
 
         if (apiRecalls && Array.isArray(apiRecalls) && apiRecalls.length > 0) {
-        console.log(`Live API returned ${apiRecalls.length} recalls (using live data)`);
+        
 
         if (riskLevel && riskLevel !== 'all') {
           apiRecalls = apiRecalls.filter(r => r.riskLevel === riskLevel);
@@ -332,7 +333,7 @@ exports.getRecalls = async (req, res) => {
 
         exports.saveApiResultsToDB(apiRecalls).catch(err => console.error('Failed to save API results to DB:', err.message));
       } else {
-        console.log('Live API did not return in time; falling back to DB');
+      
 
         const dbBase = { isActive: true };
 
@@ -568,7 +569,7 @@ exports.lookupProduct = async (req, res) => {
   try {
     const { barcode, productName } = req.body;
     
-    console.log('Product lookup request:', { barcode, productName });
+    
 
     if (!barcode && !productName) {
       return res.status(400).json({
@@ -584,15 +585,12 @@ exports.lookupProduct = async (req, res) => {
     try {
       if (barcode) {
         const offResp = await fetchJson(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(barcode)}.json`, 8000);
-        console.log('OFF barcode lookup response status:', offResp && offResp.status);
         if (offResp && offResp.status === 1 && offResp.product) {
           offProduct = offResp.product;
-          console.log('OFF product found by barcode:', offProduct.code || offProduct._id || '(no code)');
         }
       } else if (productName) {
         const params = new URLSearchParams({ search_terms: productName, search_simple: 1, action: 'process', json: 1, page_size: 8 });
         const offResp = await fetchJson(`https://world.openfoodfacts.org/cgi/search.pl?${params.toString()}`, 8000);
-        console.log('OFF search returned products:', offResp && Array.isArray(offResp.products) ? offResp.products.length : 0);
 
         if (offResp && Array.isArray(offResp.products) && offResp.products.length > 0) {
           const products = offResp.products;
@@ -607,9 +605,8 @@ exports.lookupProduct = async (req, res) => {
             if (score > bestScore) { best = p; bestScore = score; }
           }
           offProduct = best || products[0];
-          console.log('OFF chosen product:', offProduct && (offProduct.product_name || offProduct.generic_name || offProduct.code || '(no identifier)'));
         } else {
-          console.log('OFF search returned no products for term:', productName);
+          // No OFF products returned for term
         }
       }
     } catch (offErr) {
@@ -632,7 +629,7 @@ exports.lookupProduct = async (req, res) => {
       .lean();
 
       if (relatedRecalls.length === 0) {
-        console.log('No database results, searching APIs...');
+        // No database results; searching external APIs
         try {
           const apiRecalls = await recallApiService.searchRecalls(searchTerm, 10);
           relatedRecalls = apiRecalls.map(recall => this.normalizeRecallData(recall));
@@ -747,8 +744,7 @@ exports.getRecall = async (req, res) => {
     let recall = await Recall.findById(req.params.id).lean();
     
     if (!recall) {
-      console.log(`Recall ${req.params.id} not in DB, checking APIs...`);
-      
+      // Recall not in DB; redirecting to recalls list
       return res.redirect('/recalls');
     }
 
@@ -854,7 +850,7 @@ exports.apiGetRecalls = async (req, res) => {
 
 exports.syncRecalls = async (req, res) => {
   try {
-    console.log('Manual recall sync requested');
+    // Manual recall sync requested
     
     const apiRecalls = await recallApiService.fetchAllRecalls({
       limit: 100,
@@ -1155,7 +1151,7 @@ exports.saveApiResultsToDB = async (apiRecalls) => {
     }
   }
   
-  console.log(`Saved ${savedCount} new recalls to database`);
+  // Saved new recalls count (log removed)
   return savedCount;
 };
 
@@ -1170,10 +1166,8 @@ exports.saveApiResultsToDB = async (apiRecalls) => {
  */
 exports.reNormalizeAllRecalls = async () => {
   try {
-    console.log('Starting re-normalization of all recalls in database...');
-    
+    // Starting re-normalization of all recalls in database
     const allRecalls = await Recall.find({}).lean();
-    console.log(`Found ${allRecalls.length} recalls to process`);
     
     let updatedCount = 0;
     
@@ -1199,7 +1193,7 @@ exports.reNormalizeAllRecalls = async () => {
       }
     }
     
-    console.log(`Re-normalized ${updatedCount} recalls`);
+    // Re-normalization completed (summary log removed)
     return updatedCount;
   } catch (error) {
     console.error('Re-normalization error:', error);

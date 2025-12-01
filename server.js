@@ -61,11 +61,11 @@ app.use(passport.session());
 // === Middleware: Flash messages ===
 app.use(flash());
 
-
+// === View Engine ===
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-
+// === Middleware: Pass user info ===
 app.use((req, res, next) => {
   res.locals.user = req.user; // Current logged in user info
   res.locals.success = req.flash('success'); // Success messages
@@ -73,13 +73,13 @@ app.use((req, res, next) => {
   next(); // Move to next middleware
 });
 
-
+// === Routes ===
 app.use('/', require('./routes/main')); // Homepage and dashboard
 app.use('/auth', require('./routes/auth')); // Login and signup
 app.use('/recalls', require('./routes/recalls')); // Food recalls
 app.use('/posts', require('./routes/posts')); // Forum posts
 
-
+// === 404 Not Found ===
 app.use((req, res) => {
   res.status(404).render('error', {
     title: 'Page Not Found',
@@ -88,6 +88,7 @@ app.use((req, res) => {
   });
 });
 
+// === Error Handling ===
 app.use((err, req, res, next) => {
   console.error('Server Error:', err);
   
@@ -101,10 +102,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-
+// === Start Server ===
 const startServer = async () => {
   try {
-    console.log('🔌 Attempting to connect to database...');
+    console.log('Attempting to connect to database...');
     
     await connectDB();
     
@@ -121,15 +122,6 @@ const startServer = async () => {
   } catch (error) {
     console.error('='.repeat(50));
     console.error('FAILED TO START SERVER');
-    console.error('='.repeat(50));
-    console.error('Error:', error.message);
-    console.log('\nTROUBLESHOOTING STEPS:');
-    console.log('1. Check if MongoDB is running');
-    console.log('2. Verify MONGODB_URI in .env file');
-    console.log('3. Check your internet connection (if using MongoDB Atlas)');
-    console.log('4. Make sure MongoDB service is started');
-    console.log('='.repeat(50));
-    
     process.exit(1);
   }
 };

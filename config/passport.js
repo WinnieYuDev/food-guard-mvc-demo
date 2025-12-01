@@ -8,6 +8,7 @@
 const LocalStrategy = require('passport-local').Strategy;
 const User = require('../models/User');
 
+// Configure Passport strategies
 module.exports = function(passport) {
   passport.use(new LocalStrategy(
     { 
@@ -33,7 +34,7 @@ module.exports = function(passport) {
       }
     }
   ));
-
+  // Serialize user to session  
   passport.serializeUser((user, done) => {
     done(null, user.id);
   });

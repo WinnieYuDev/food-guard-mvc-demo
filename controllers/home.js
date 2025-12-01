@@ -34,6 +34,7 @@ const categoryImageMap = {
     'other': '/imgs/placeholder-food.png' // Local fallback
 };
 
+// Get category image
 const getCategoryImage = (category) => {
     if (!category) return categoryImageMap.other;
     const normalizedCategory = category.toLowerCase().trim();
@@ -97,16 +98,7 @@ const keywordImageMap = {
     baby: 'https://www.foodbusinessnews.net/ext/resources/2020/3/Baby-Food_Lead.webp?height=667&t=1584542595&width=1080'
 };
 
-// === Helpers: Image selection and text cleaning ===
-// Functions that choose the best image URL and normalize display text for
-// the homepage recall cards.
-// selectImageFromText(text, fallbackCategory)
-// Scans the provided `text` (usually a combination of title, product, brand,
-// and category) for keywords defined in `keywordImageMap`. The function tries
-// to match longer keywords first so that specific phrases (e.g. "scrambled eggs")
-// are preferred over shorter ones (e.g. "egg"). If a keyword is found, the
-// corresponding image URL is returned. Otherwise, the category fallback image
-// is returned via `getCategoryImage`.
+// Select image based on keywords in text
 const selectImageFromText = (text, fallbackCategory) => {
     if (!text) return getCategoryImage(fallbackCategory);
 
@@ -117,22 +109,18 @@ const selectImageFromText = (text, fallbackCategory) => {
 
     for (const key of sortedKeys) {
         if (normalized.includes(key)) {
-            // Helpful debug log when running locally
-            console.log(`Matched keyword "${key}" in text: "${text.substring(0, 50)}..."`);
             return keywordImageMap[key];
         }
     }
 
     // No keyword matched; use the category-based image
-    console.log(`Using category fallback for: "${fallbackCategory}"`);
     return getCategoryImage(fallbackCategory);
 };
 
-// === Helpers: Title/Reason sanitizers ===
-// toTitleCase(s)
-// Returns a version of the string where the first letter of each word is
-// capitalized and the rest of the letters are lower-case. Useful for
-// normalizing product and brand names for display.
+// Clean product title
+// Removes weight and measurement mentions from text, such as "5 lb", "12 oz",
+// and parenthesized values like "(2 lbs)". This avoids cluttering titles
+// and reasons with irrelevant numeric measurements.
 const toTitleCase = (s) => {
     if (!s) return s;
     return s.toLowerCase().replace(/\b(\w)/g, c => c.toUpperCase());
@@ -226,7 +214,7 @@ const sanitizeReason = (reason, title) => {
 // for each recall card.
 exports.getHome = async (req, res) => {
     try {
-        console.log('Home controller called');
+        
 
         let activeRecalls = [];
         let recentPosts = [];
@@ -240,9 +228,7 @@ exports.getHome = async (req, res) => {
                     .sort({ recallDate: -1 })
                     .limit(6)
                     .lean();
-
-                console.log(`Found ${activeRecalls.length} active recalls`);
-
+                // Active recalls loaded
                 activeRecalls = activeRecalls.map(recall => {
                     const normalizedRecall = recallsController.normalizeRecallData(recall);
                     
@@ -258,7 +244,7 @@ exports.getHome = async (req, res) => {
                     } else if (normalizedRecall.distribution) {
                         locations = dedupeCommaParts(normalizedRecall.distribution);
                     }
-
+                    // Cleaned title, reason, locations
                     const combinedText = [cleanedTitle, normalizedRecall.product, normalizedRecall.brand, normalizedRecall.category].filter(Boolean).join(' ');
                     const chosenImage = selectImageFromText(combinedText, category);
 
@@ -271,25 +257,24 @@ exports.getHome = async (req, res) => {
                         image: chosenImage
                     };
                 });
-
+                // recent posts loaded
                 recentPosts = await Post.find({ isActive: true })
                     .populate('author', 'username')
                     .sort({ createdAt: -1 })
                     .limit(3)
                     .lean();
 
-                console.log(`Homepage data loaded: ${recentPosts.length} posts, ${activeRecalls.length} recalls`);
+                // Homepage data loaded
             } catch (dbError) {
-                console.log('Database query failed:', dbError.message);
+                console.error('Database query failed:', dbError.message);
             }
         } else {
-            console.log('MongoDB not connected, using empty data');
+            console.warn('MongoDB not connected, using empty data');
         }
-
-        console.log('Rendering index.ejs');
-        res.render('index', {
-            title: 'FoodGuard - Home',
-            recalls: activeRecalls, // This now contains the 'categoryImage' property
+        // Render homepage
+        res.render('index', { 
+            title: 'FoodGuard - Home', 
+            recalls: activeRecalls,
             posts: recentPosts,
             user: req.user
         });

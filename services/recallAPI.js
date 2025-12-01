@@ -6,6 +6,7 @@
  * application-level object shape used by controllers and the front-end.
  */
 const axios = require('axios');
+const dev = process.env.NODE_ENV === 'development';
 
 class RecallApiService {
   constructor() {
@@ -43,7 +44,6 @@ class RecallApiService {
 
       const searchQuery = queryParts.join('+AND+');
       const url = `${this.fdaBaseUrl}?limit=${Math.min(limit, 100)}&sort=report_date:desc${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`;
-      console.log('FDA API call:', url);
 
       const response = await axios.get(url, {
         timeout: 10000,
@@ -51,17 +51,14 @@ class RecallApiService {
       });
 
       const results = response.data.results || [];
-      console.log(`FDA API returned ${results.length} recalls`);
 
       return this.transformFDAData(results);
       } catch (error) {
       console.error('FDA API Error (primary query):', error.response?.status, error.message);
       try {
         const fallbackUrl = `${this.fdaBaseUrl}?limit=${Math.min(limit, 100)}&sort=report_date:desc`;
-        console.log('FDA fallback API call (simple):', fallbackUrl);
         const fallbackResp = await axios.get(fallbackUrl, { timeout: 10000, headers: { 'User-Agent': 'FoodSafetyApp/1.0' } });
         const fbResults = fallbackResp.data.results || [];
-        console.log(`FDA API fallback returned ${fbResults.length} recalls`);
         return this.transformFDAData(fbResults);
       } catch (fbError) {
         console.error('FDA API fallback error:', fbError.response?.status, fbError.message || fbError);
@@ -107,9 +104,6 @@ class RecallApiService {
   async fetchFSISRecalls(options = {}) {
     try {
       const { limit = 50, monthsBack = 5, search = '' } = options;
-      
-      console.log('FSIS API call:', this.fsisBaseUrl);
-      
       const response = await axios.get(this.fsisBaseUrl, {
         timeout: 8000,
         headers: {
@@ -141,9 +135,6 @@ class RecallApiService {
       }
 
       results = results.slice(0, limit);
-      
-      console.log(`FSIS API returned ${results.length} recalls`);
-      
       return this.transformFSISData(results);
     } catch (error) {
       console.error('FSIS API Error:', error.response?.status, error.message);
@@ -160,8 +151,6 @@ class RecallApiService {
    */
   async fetchAllRecalls(filters = {}) {
     try {
-      console.log('Starting to fetch all recalls...');
-      
       const [fdaRecalls, fsisRecalls] = await Promise.allSettled([
         this.fetchFDARecalls(filters),
         this.fetchFSISRecalls(filters)
@@ -171,22 +160,13 @@ class RecallApiService {
 
       if (fdaRecalls.status === 'fulfilled') {
         recalls.push(...fdaRecalls.value);
-        console.log(`FDA: ${fdaRecalls.value.length} recalls`);
-      } else {
-        console.log('FDA API failed');
       }
 
       if (fsisRecalls.status === 'fulfilled') {
         recalls.push(...fsisRecalls.value);
-        console.log(`FSIS: ${fsisRecalls.value.length} recalls`);
-      } else {
-        console.log('FSIS API failed');
       }
 
-      console.log(`Total API recalls: ${recalls.length}`);
-      
       if (recalls.length === 0) {
-        console.log('Both APIs failed, using mock data');
         return this.getMockRecalls(filters);
       }
       

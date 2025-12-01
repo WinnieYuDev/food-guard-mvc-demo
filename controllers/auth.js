@@ -5,15 +5,18 @@
  * handle signup and login form submissions, and perform logout.
  * This module uses `User` (Mongoose model) and Passport for authentication.
  */
+// User model
 const User = require('../models/User');
 const passport = require('passport');
 
+// Login page
 exports.getLogin = (req, res) => {
   res.render('login', {  // Changed from 'auth/login' to 'login'
     title: 'Login - FoodGuard'
   });
 };
 
+// Login form submission
 exports.postLogin = (req, res, next) => {
   const mongoose = require('mongoose');
   if (mongoose.connection.readyState !== 1) {
@@ -21,6 +24,7 @@ exports.postLogin = (req, res, next) => {
     return res.redirect('/auth/login');
   }
 
+  // Authenticate user
   passport.authenticate('local', {
     successRedirect: '/', // Go to homepage if login works
     failureRedirect: '/auth/login', // Go back to login if fails
@@ -28,28 +32,26 @@ exports.postLogin = (req, res, next) => {
   })(req, res, next);
 };
 
+// Signup page
 exports.getSignup = (req, res) => {
   res.render('signup', {  // Changed from 'auth/signup' to 'signup'
     title: 'Sign Up - FoodGuard'
   });
 };
 
+// Signup form submission
 exports.postSignup = async (req, res) => {
   try {
-    console.log('SIGNUP: Starting signup process...');
-    
+    // Signup flow started
     const { username, email, password, confirmPassword } = req.body;
-
-    console.log('SIGNUP: Form data received', { username, email });
 
     const mongoose = require('mongoose');
     if (mongoose.connection.readyState !== 1) {
-      console.log('SIGNUP: Database not connected');
+      // Database not connected
       req.flash('error', 'Registration service temporarily unavailable. Please try again later.');
       return res.redirect('/auth/signup');
     }
-
-    console.log('SIGNUP: Database connected, validating input...');
+    // Database connected, validating input...
 
     if (!username || !email || !password || !confirmPassword) {
       req.flash('error', 'All fields are required');
@@ -57,32 +59,30 @@ exports.postSignup = async (req, res) => {
     }
 
     if (password !== confirmPassword) {
-      console.log('SIGNUP: Passwords do not match');
+      // Passwords do not match
       req.flash('error', 'Passwords do not match');
       return res.redirect('/auth/signup');
     }
 
     if (password.length < 6) {
-      console.log('SIGNUP: Password too short');
+      // Password too short
       req.flash('error', 'Password must be at least 6 characters');
       return res.redirect('/auth/signup');
     }
-
-    console.log('SIGNUP: Checking for existing user...');
+    // Checking for existing user
 
     const existingUser = await User.findOne({
       $or: [{ email: email.toLowerCase() }, { username }]
     });
 
-    console.log('SIGNUP: Existing user check result:', existingUser ? 'User exists' : 'No existing user');
+    // Existing user check result
 
     if (existingUser) {
-      console.log('SIGNUP: User already exists');
+      // User already exists
       req.flash('error', 'User already exists with this email or username');
       return res.redirect('/auth/signup');
     }
-
-    console.log('SIGNUP: Creating new user...');
+    // Creating new user
 
     const user = new User({
       username,
@@ -90,11 +90,7 @@ exports.postSignup = async (req, res) => {
       password
     });
 
-    console.log('SIGNUP: Saving user to database...');
-
     await user.save();
-    
-    console.log('SIGNUP: User saved successfully:', user._id);
 
     req.login(user, (err) => {
       if (err) {
@@ -102,16 +98,14 @@ exports.postSignup = async (req, res) => {
         req.flash('success', 'Account created! Please log in.');
         return res.redirect('/auth/login');
       }
-      console.log('SIGNUP: User auto-logged in successfully');
+      // User auto-logged in successfully
       req.flash('success', 'Welcome to FoodGuard!');
       res.redirect('/');
     });
 
   } catch (error) {
   console.error('SIGNUP: Error in catch block:', error);
-  console.error('Error name:', error.name);
-  console.error('Error message:', error.message);
-    
+    // Error in signup flow
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(e => e.message);
       req.flash('error', errors[0] || 'Validation error');
@@ -127,6 +121,7 @@ exports.postSignup = async (req, res) => {
   }
 };
 
+// Logout
 exports.logout = (req, res) => {
   req.logout((err) => {
     if (err) {
