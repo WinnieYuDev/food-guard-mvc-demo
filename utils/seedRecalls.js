@@ -222,11 +222,9 @@ const seedRecalls = [
 
 const seedDatabase = async () => {
   try {
-    // Clear existing recalls
     await Recall.deleteMany({});
     console.log('Cleared existing recalls');
     
-    // Insert new recalls
     await Recall.insertMany(seedRecalls);
     console.log(`Seeded ${seedRecalls.length} recalls into database`);
     
@@ -237,7 +235,6 @@ const seedDatabase = async () => {
   }
 };
 
-// Only run if called directly
 if (require.main === module) {
   require('dotenv').config();
   mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/foodguard')

@@ -1,16 +1,10 @@
-// FoodGuard - Recalls Page JavaScript
-// This file handles all the client-side functionality for the recalls page
 
-// Wait for the DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Product lookup functionality
     const productLookupForm = document.getElementById('productLookupForm');
     if (productLookupForm) {
         productLookupForm.addEventListener('submit', handleProductLookup);
     }
 
-    // Recall filtering functionality
-    // IDs in the page: #search, #category, #retailer, #riskLevel, #sortBy, #sortOrder
     const searchEl = document.getElementById('search');
     const categoryEl = document.getElementById('category');
     const retailerEl = document.getElementById('retailer');
@@ -22,26 +16,21 @@ document.addEventListener('DOMContentLoaded', function() {
     if (riskEl) riskEl.addEventListener('change', handleRecallFilter);
     if (sortOrderEl) sortOrderEl.addEventListener('change', handleRecallFilter);
     if (searchEl) searchEl.addEventListener('input', debounce(handleRecallFilter, 500));
-    // Load recent recall news (right-hand panel)
     try { if (typeof loadRecallNews === 'function') loadRecallNews(); } catch (e) { console.warn('loadRecallNews failed to init', e); }
 });
 
-// Handle product lookup form submission
 async function handleProductLookup(e) {
     e.preventDefault(); // Prevent form from submitting normally
     
-    // Get form data
     const formData = new FormData(e.target);
     const barcode = formData.get('barcode');
     const productName = formData.get('productName');
     
     try {
-        // Show loading state
         const resultsDiv = document.getElementById('productResults');
         resultsDiv.classList.remove('hidden');
         resultsDiv.innerHTML = '<div class="text-center py-4 text-gray-600">Searching for product information...</div>';
         
-        // Send request to our server
         const response = await fetch('/recalls/lookup', {
             method: 'POST',
             headers: {
@@ -50,15 +39,12 @@ async function handleProductLookup(e) {
             body: JSON.stringify({ barcode, productName })
         });
         
-        // Check if response is OK
         if (!response.ok) {
             throw new Error('Network response was not ok');
         }
         
-        // Get the response data
         const data = await response.json();
         
-        // Display the results
         displayProductResults(data);
     } catch (error) {
         console.error('Product lookup error:', error);
@@ -72,17 +58,15 @@ async function handleProductLookup(e) {
     }
 }
 
-// Display product search results
 function displayProductResults(data) {
     const resultsDiv = document.getElementById('productResults');
     
-    // Create the results HTML
     resultsDiv.innerHTML = `
         <div class="bg-gray-50 rounded-lg p-6 border border-gray-200">
             <h3 class="text-lg font-semibold mb-4 text-gray-900">Product Information</h3>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-                <!-- Basic Product Info -->
+                
                 <div>
                     <h4 class="font-medium mb-2 text-gray-900">Basic Info</h4>
                     <div class="space-y-2 text-sm">
@@ -92,7 +76,7 @@ function displayProductResults(data) {
                     </div>
                 </div>
                 
-                <!-- Allergens -->
+                
                 <div>
                     <h4 class="font-medium mb-2 text-gray-900">Allergens</h4>
                     ${data.product.allergens.length > 0 ? 
@@ -102,13 +86,13 @@ function displayProductResults(data) {
                 </div>
             </div>
             
-            <!-- Ingredients -->
+            
             <div class="mb-4">
                 <h4 class="font-medium mb-2 text-gray-900">Ingredients</h4>
                 <p class="text-sm text-gray-700">${data.product.ingredients}</p>
             </div>
             
-            <!-- Nutrition Facts (if available) -->
+            
             ${data.product.nutritionFacts ? `
                 <div class="mb-4">
                     <h4 class="font-medium mb-2 text-gray-900">Nutrition Facts (per serving)</h4>
@@ -121,7 +105,7 @@ function displayProductResults(data) {
                 </div>
             ` : ''}
             
-            <!-- Recall Status Alert -->
+            
             ${data.hasRecalls ? `
                 <div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
                     <div class="flex items-start">
@@ -144,46 +128,35 @@ function displayProductResults(data) {
                 </div>
             `}
             
-            <!-- Safety Tips -->
-            <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h4 class="font-medium text-blue-800 mb-2">Food Safety Tips</h4>
-                <ul class="text-sm text-blue-700 space-y-1 list-disc list-inside">
-                    <li>Always check expiration dates before consumption</li>
-                    <li>Store products according to package instructions</li>
-                    <li>Wash hands before handling food products</li>
-                    <li>Report any suspicious products to the manufacturer</li>
-                </ul>
+            
+            <div class="mt-4">
+                <a href="/about" class="inline-flex items-center text-usda-blue hover:text-usda-darkblue font-medium">
+                    About FoodGuard
+                </a>
             </div>
         </div>
     `;
 }
 
-// Handle recall filtering
 function handleRecallFilter() {
-    // Read filter values from the page (use same names as server expects)
     const search = (document.getElementById('search') && document.getElementById('search').value) || '';
     const category = (document.getElementById('category') && document.getElementById('category').value) || 'all';
     const retailer = (document.getElementById('retailer') && document.getElementById('retailer').value) || 'all';
     const riskLevel = (document.getElementById('riskLevel') && document.getElementById('riskLevel').value) || 'all';
-    // Sorting is always by recallDate; UI only exposes order (asc/desc)
     const sortOrder = (document.getElementById('sortOrder') && document.getElementById('sortOrder').value) || 'desc';
 
-    // Build URL with filter parameters; only include non-default values to keep URLs tidy
     const params = new URLSearchParams();
     if (search.trim()) params.set('search', search.trim());
     if (category !== 'all') params.set('category', category);
     if (retailer !== 'all') params.set('retailer', retailer);
     if (riskLevel !== 'all') params.set('riskLevel', riskLevel);
-    // We don't send sortBy; server always sorts by recallDate. Only send order if non-default.
     if (sortOrder && sortOrder !== 'desc') params.set('sortOrder', sortOrder);
 
     const query = params.toString();
     const target = query ? ('/recalls?' + query) : '/recalls';
-    // Navigate to the filtered page
     window.location.href = target;
 }
 
-// Utility function to debounce rapid filter changes
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -196,16 +169,13 @@ function debounce(func, wait) {
     };
 }
 
-// (Debounced search input attached inside DOMContentLoaded)
 
-// Load recent recall news into the right-hand panel
 async function loadRecallNews() {
     const recallNewsList = document.getElementById('recallNewsList');
     if (!recallNewsList) return;
 
     recallNewsList.innerHTML = 'Loading recent recalls...';
 
-    // Fetch news via server proxy to avoid CORS
     const urlNews = '/recalls/news';
 
     try {
@@ -224,7 +194,6 @@ async function loadRecallNews() {
         for (let i = 0; i < data.results.length; i++) {
             const item = data.results[i];
 
-            // Normalized fields from server: title, articleLink, recallDate, reason, brand, product, distribution
             const titleText = item.title || item.product || 'Recall Notice';
             let date = '';
             if (item.recallDate) {
@@ -238,9 +207,25 @@ async function loadRecallNews() {
             const li = document.createElement('li');
             li.className = 'recall-news-item';
 
-            // Build direct article link if available, otherwise construct a search link
-            // Prefer direct FDA article links when present (recall_url or url). Fallback to FDA search.
-            const articleHref = item.articleLink || (item.rawData && (item.rawData.recall_url || item.rawData.url)) || (`https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts/${encodeURIComponent(((item.brand || item.recalling_firm) || '').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}-recalls-${encodeURIComponent(((item.product || item.product_description) || '').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}`);
+            let articleHref = null;
+            if (item.articleLink && typeof item.articleLink === 'string' && item.articleLink.startsWith('http')) {
+                articleHref = item.articleLink;
+            } else if (item.rawData && typeof item.rawData === 'object') {
+                const tryKeys = ['recall_url','url','link','article_url','recallLink','recallUrl'];
+                for (const k of tryKeys) {
+                    const val = item.rawData[k];
+                    if (val && typeof val === 'string' && val.startsWith('http')) { articleHref = val; break; }
+                }
+            }
+            if (!articleHref) {
+                if (item.articleLink && typeof item.articleLink === 'string') articleHref = item.articleLink;
+                else {
+                    const brandSlug = ((item.brand || item.recalling_firm) || '').toString().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+                    const productSlug = ((item.product || item.product_description) || '').toString().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+                    const base = (item.agency && item.agency.toUpperCase() === 'FSIS') ? 'https://www.fsis.usda.gov/recalls-alerts' : 'https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts';
+                    articleHref = `${base}/${brandSlug}-recalls-${productSlug}`;
+                }
+            }
             const a = document.createElement('a');
             a.className = 'fda-news-link';
             a.href = articleHref;

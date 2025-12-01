@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const recallsController = require('../controllers/recalls');
 
-// Debug: Check if controller functions exist
 console.log('Recalls controller loaded:', {
   getRecalls: typeof recallsController.getRecalls,
   getRecall: typeof recallsController.getRecall,
@@ -10,22 +9,16 @@ console.log('Recalls controller loaded:', {
   apiGetRecalls: typeof recallsController.apiGetRecalls
 });
 
-// Main recalls page - uses live API data only
 router.get('/', recallsController.getRecalls);
 
-// Server-side news proxy to fetch FDA recall news
 router.get('/news', recallsController.getNews);
 
-// Single recall detail page - uses live API data
 router.get('/:id', recallsController.getRecall);
 
-// Product lookup API endpoint - uses live API search
 router.post('/lookup', recallsController.lookupProduct);
 
-// External API endpoint - returns live API data
 router.get('/api/recalls', recallsController.apiGetRecalls);
 
-// Debug route to test APIs directly
 router.get('/debug/apis', async (req, res) => {
   try {
     const recallApiService = require('../services/recallAPI');
@@ -33,7 +26,6 @@ router.get('/debug/apis', async (req, res) => {
     
     console.log('Testing government APIs...');
     
-    // Test FDA API
     let fdaStatus = 'unknown';
     let fdaCount = 0;
     try {
@@ -48,7 +40,6 @@ router.get('/debug/apis', async (req, res) => {
       console.log('FDA API failed:', fdaError.message);
     }
     
-    // Test FSIS API
     let fsisStatus = 'unknown';
     let fsisCount = 0;
     try {
@@ -63,7 +54,6 @@ router.get('/debug/apis', async (req, res) => {
       console.log('FSIS API failed:', fsisError.message);
     }
     
-    // Test our recall service
     let serviceStatus = 'unknown';
     let serviceCount = 0;
     try {
@@ -95,7 +85,6 @@ router.get('/debug/apis', async (req, res) => {
   }
 });
 
-// Debug route to check current recalls
 router.get('/debug/current', async (req, res) => {
   try {
     const recallApiService = require('../services/recallAPI');

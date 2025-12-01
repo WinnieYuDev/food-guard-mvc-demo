@@ -1,0 +1,152 @@
+<%- include('partials/header') %>
+
+<main class="min-h-screen bg-gray-50">
+    
+    <section class="bg-gradient-to-br from-usda-blue to-usda-darkblue text-white py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                <h1 class="text-4xl md:text-5xl font-bold mb-6">About FoodGuard</h1>
+                <p class="text-xl text-blue-100 max-w-3xl mx-auto leading-relaxed">
+                    Protecting families through real-time food safety monitoring and community-driven 
+                    awareness. We're committed to making food safety information accessible to everyone.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    
+    <section class="py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16 space-y-6">
+                <h2 class="text-3xl font-bold text-gray-900">Our Mission</h2>
+                <p class="text-lg text-gray-600 max-w-4xl mx-auto leading-relaxed text-center px-4 sm:px-6">
+                    FoodGuard was created to bridge the gap between official food recall announcements
+                    and public awareness. We believe that everyone deserves access to timely, accurate
+                    information about food safety risks.
+                </p>
+            </div>
+
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
+                <% if (locals.stats) { %>
+                    <% stats.forEach(stat => { %>
+                        <div class="text-center">
+                            <div class="text-3xl md:text-4xl font-bold text-usda-blue mb-2"><%= stat.number %></div>
+                            <div class="text-gray-600 font-medium"><%= stat.label %></div>
+                        </div>
+                    <% }); %>
+                <% } %>
+            </div>
+
+            
+        </div>
+    </section>
+
+    
+    <section class="py-16 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-900 mb-4">How FoodGuard Works</h2>
+                <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                    Our system continuously monitors multiple data sources to keep you informed and protected.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-usda-blue rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-2xl text-white">1</span>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Monitor</h3>
+                    <p class="text-gray-600">
+                        We continuously scan FDA, USDA, and other official recall databases 
+                        for new food safety alerts and updates.
+                    </p>
+                </div>
+
+                
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-usda-green rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-2xl text-white">2</span>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Analyze</h3>
+                    <p class="text-gray-600">
+                        Our system processes and categorizes each recall by risk level, 
+                        product type, and affected regions for easy understanding.
+                    </p>
+                </div>
+
+                
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-usda-red rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="text-2xl text-white">3</span>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Alert</h3>
+                    <p class="text-gray-600">
+                        You receive instant notifications about recalls that matter to you, 
+                        with clear guidance on what to do next.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    
+    <section class="py-16 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-900 mb-4">Our Values</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200 text-center">
+                    <div class="w-12 h-12 rounded-lg flex items-center justify-center mb-4 mx-auto bg-center bg-contain bg-no-repeat" style="background-image: url('https://img.icons8.com/ios-filled/100/005EA2/search--v1.png');" role="img" aria-hidden="true"></div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Transparency</h3>
+                    <p class="text-gray-600">We believe in open access to food safety information. All our data sources are clearly cited and available for verification.</p>
+                </div>
+
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200 text-center">
+                    <div class="w-12 h-12 rounded-lg flex items-center justify-center mb-4 mx-auto bg-center bg-contain bg-no-repeat" style="background-image: url('https://img.icons8.com/ios-filled/100/005EA2/clock.png');" role="img" aria-hidden="true"></div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Timeliness</h3>
+                    <p class="text-gray-600">Food safety requires immediate action. We prioritize speed in detecting and communicating new recalls to our users.</p>
+                </div>
+
+                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-200 text-center">
+                    <div class="w-12 h-12 rounded-lg flex items-center justify-center mb-4 mx-auto bg-center bg-contain bg-no-repeat" style="background-image: url('https://img.icons8.com/ios-filled/100/005EA2/conference-call.png');" role="img" aria-hidden="true"></div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Community</h3>
+                    <p class="text-gray-600">We foster a supportive community where users can share experiences, ask questions, and help protect each other.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    
+    <section class="py-16 bg-usda-blue text-white">
+        <div class="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold mb-6">Ready to Protect Your Family?</h2>
+            <p class="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
+                Join thousands of families who trust FoodGuard to keep their food safe.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <% if (user) { %>
+                    <a href="/recalls" class="bg-white text-usda-blue px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+                        View Active Recalls
+                    </a>
+                    <a href="/dashboard" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-usda-blue transition-colors">
+                        Go to Dashboard
+                    </a>
+                <% } else { %>
+                    <a href="/auth/register" class="bg-white text-usda-blue px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+                        Sign Up Free
+                    </a>
+                    <a href="/recalls" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-usda-blue transition-colors">
+                        Browse Recalls
+                    </a>
+                <% } %>
+            </div>
+        </div>
+    </section>
+</main>
+
+<%- include('partials/footer') %>

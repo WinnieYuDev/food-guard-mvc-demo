@@ -1,6 +1,6 @@
-/* Custom USDA/FDA Inspired Styles for FoodGuard */
 
-/* Recall image overlay styles */
+
+
 .recall-image {
     position: relative;
     overflow: hidden;
@@ -16,7 +16,7 @@
     padding: 1.5rem;
 }
 
-/* Government-style alert animations */
+
 @keyframes pulse-alert {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
@@ -26,7 +26,7 @@
     animation: pulse-alert 2s infinite;
 }
 
-/* Risk level color coding */
+
 .risk-high {
     background-color: #E52207;
     color: white;
@@ -42,12 +42,12 @@
     color: white;
 }
 
-/* Smooth transitions for all interactive elements */
+
 .transition-all {
     transition: all 0.3s ease;
 }
 
-/* Custom scrollbar for webkit browsers */
+
 ::-webkit-scrollbar {
     width: 8px;
 }
@@ -65,7 +65,7 @@
     background: #1A4480;
 }
 
-/* Focus styles for accessibility */
+
 button:focus, 
 input:focus, 
 select:focus, 
@@ -74,7 +74,7 @@ textarea:focus {
     outline-offset: 2px;
 }
 
-/* Line clamp utilities for text truncation */
+
 .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -90,25 +90,25 @@ textarea:focus {
     overflow: hidden;
 }
 
-/* Custom styles for the CDC widget container */
+
 [data-cdc-widget] {
     border-radius: 8px;
     overflow: hidden;
 }
 
-/* FDA News widget styles (match CDC widget look) */
+
 .fda-news-list, #fdaNewsList, #recallNewsList {
     list-style: none;
     margin: 0;
     padding: 0;
 }
 
-/* Divider for both FDA and recall news items */
+
 .fda-news-item,
 .recall-news-item {
     display: block;
     padding: 0.5rem 0 0.75rem 0;
-    border-bottom: 1px solid #e5e7eb; /* light gray (tailwind gray-200) */
+    border-bottom: 1px solid #e5e7eb; 
     margin-bottom: 0.5rem;
 }
 
@@ -121,7 +121,7 @@ textarea:focus {
 
 .fda-news-link {
     display: block;
-    color: #0b3d91; /* CDC-like blue */
+    color: #0b3d91; 
     font-weight: 600;
     text-decoration: none;
 }
@@ -150,31 +150,31 @@ textarea:focus {
     overflow: hidden;
 }
 
-/* Scrolling container to mimic CDC widget height and allow scrolling */
+
 #fdaNewsList {
     max-height: 320px;
     overflow-y: auto;
     padding-right: 0.25rem;
 }
 
-/* Ensure the recall sidebar list scrolls and has a pleasant background */
+
 #recallNewsList {
     max-height: 520px;
     overflow-y: auto;
     padding-right: 0.25rem;
 }
 
-/* Color tweaks for titles and reason text to match CDC look */
+
 .recall-title { color: #0b3d91; font-weight: 600; }
 .recall-reason { color: #374151; }
 
-/* Loading states */
+
 .loading {
     opacity: 0.6;
     pointer-events: none;
 }
 
-/* Success and error message styles */
+
 .message-success {
     background-color: #d4edda;
     border-color: #c3e6cb;
@@ -187,7 +187,7 @@ textarea:focus {
     color: #721c24;
 }
 
-/* Mobile responsiveness improvements */
+
 @media (max-width: 768px) {
     .recall-overlay {
         padding: 1rem;
@@ -202,7 +202,7 @@ textarea:focus {
     }
 }
 
-/* Print styles */
+
 @media print {
     .no-print {
         display: none !important;

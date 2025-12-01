@@ -3,27 +3,21 @@ const recallApiService = require('../services/recallAPI');
 const axios = require('axios');
 const https = require('https');
 
-// Helper to extract clean brand/manufacturer name from long strings
 const cleanBrandName = (brandText) => {
   if (!brandText) return 'Unknown Brand';
   
   let cleaned = brandText;
   
-  // Remove addresses and location info (street addresses, cities, states, zip codes)
   cleaned = cleaned.replace(/,?\s*\d+\s+[A-Za-z\s]+(?:Ave|Avenue|St|Street|Rd|Road|Blvd|Boulevard|Dr|Drive|Ln|Lane|Way|Court|Ct|Place|Pl)\.?[,\s]*/gi, '');
   cleaned = cleaned.replace(/,?\s*[A-Z][a-z]+,\s*[A-Z]{2}\s*\d{5}(-\d{4})?/g, ''); // City, ST 12345
   cleaned = cleaned.replace(/,?\s*[A-Z]{2}\s*\d{5}(-\d{4})?/g, ''); // ST 12345
   
-  // Take only the first part if comma-separated (before address/city)
   if (cleaned.includes(',')) {
     cleaned = cleaned.split(',')[0].trim();
   }
   
-  // Also split on period if it looks like end of company name before address
-  // e.g., "Echo Lake Foods, Inc." or "Twin Marquis Inc. Brooklyn"
   const parts = cleaned.split('.');
   if (parts.length > 1) {
-    // Keep parts that look like company suffixes (Inc, LLC, Corp, etc.)
     const companyName = [];
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i].trim();
@@ -31,7 +25,6 @@ const cleanBrandName = (brandText) => {
       
       companyName.push(part);
       
-      // If this part ends with a company suffix, stop here
       if (/\b(Inc|LLC|Corp|Corporation|Co|Company|Ltd|Limited)$/i.test(part)) {
         break;
       }
@@ -43,15 +36,15 @@ const cleanBrandName = (brandText) => {
   return cleaned || 'Unknown Brand';
 };
 
-// Helper to clean up product titles by removing extraneous details
 const cleanProductTitle = (title) => {
   if (!title) return 'Unknown Product';
   
   let cleaned = title;
   
-  // Remove everything after common separators that indicate extra info
   const stopPhrases = [
     /\s+(?:bag\s+)?contains:/i,
+    /\s+imported\s+by/i,
+    /\s+distributed\s+by/i,
     /\s+manufactured\s+for:/i,
     /\.\s*net\s+wt/i,
     /\s+net\s+wt\.?/i,
@@ -65,13 +58,19 @@ const cleanProductTitle = (title) => {
     /;\s*manufactured\s+by:/i,
     /\.\s*manufactured\s+by:/i,
     /\s+manufactured\s+by:/i,
-    /;\s*upc#?\s+/i,
+    /;\s*upc#?\s*/i,
+    /\s+upc#?\s*/i,
     /\s+\d+\s+count\/case/i,
     /\bnet\s+weight:/i,
     /\bstates?\s+affected:/i,
     /\bzip\s*codes?:/i,
     /\bdistribution:/i,
-    /\bdist\s+by:/i
+    /\bdist\s+by:/i,
+    /;\s*\(/,  // semicolon followed by opening paren often indicates extra info
+    /\s+product\s+name:/i,
+    /\s+product\s+description:/i,
+    /\s+pack\/julian\s+date/i,
+    /\s+best\s+by\s+date/i
   ];
   
   for (const pattern of stopPhrases) {
@@ -81,38 +80,58 @@ const cleanProductTitle = (title) => {
       break;
     }
   }
+
+  cleaned = cleaned.replace(/\([^)]*(net\s*wt|pkg|pkgs|per\s*case|count\/case|pack)[^)]*\)/ig, '');
+
+  const segments = cleaned.split(/\.|\n/).map(s => s.trim()).filter(Boolean);
+  if (segments.length > 1) {
+    const sizeSeg = segments.find(s => /\b\d{1,2}\/\d{1,2}\b/.test(s));
+    if (sizeSeg) {
+      cleaned = sizeSeg;
+    } else {
+      cleaned = segments[0];
+    }
+  }
   
-  // Remove trailing "Bag", "Package", "Box" if at the end
   cleaned = cleaned.replace(/\s+(bag|package|box|pack)\s*$/i, '');
   
-  // Remove case/count info (e.g., "72 Count/Case", "12 Pack")
   cleaned = cleaned.replace(/\s*\d+\s*(count|ct|pack|pk)\s*\/\s*(case|cs|box)\s*/gi, '');
   
-  // Remove common junk prefixes and product codes
-  // e.g., "Echolakefoods Mf 3067 Cnfree" -> remove the manufacturer code parts
+  const multipleItemsMatch = cleaned.match(/^(.+?)\s+\d+\.\s+/);
+  if (multipleItemsMatch) {
+    cleaned = multipleItemsMatch[1];
+  }
+  
+  cleaned = cleaned.replace(/^\d+\.\s+/g, '');
+  
+  cleaned = cleaned.replace(/^(brand|product)\s+/i, '');
+  
   cleaned = cleaned.replace(/^[a-z]+\s+(mf|sku|item|code|#)\s*\d+\s*/i, '');
   
-  // Remove specific unwanted patterns
   cleaned = cleaned.replace(/\b(cnfree|cage\s*free)\s+(cage\s*free)\b/gi, 'Cage Free'); // dedupe "cnfree cage free"
   cleaned = cleaned.replace(/\bcnfree\b/gi, 'Cage Free'); // convert cnfree to readable
   cleaned = cleaned.replace(/\biaf\b/gi, 'IAF'); // normalize IAF
   
-  // Remove common weight patterns (e.g., "12 oz", "1.5 lbs", "400g")
+  cleaned = cleaned.replace(/\b(pure\s+)?alumini?um\s+(made\s+in\s+\w+\s+-\s+)?/gi, '');
+  cleaned = cleaned.replace(/\bstainless\s+steel\s+/gi, '');
+  cleaned = cleaned.replace(/\bmade\s+in\s+\w+\s+-\s+/gi, '');
+  
   cleaned = cleaned.replace(/\b\d+(\.\d+)?\s*(oz|lb|lbs|g|kg|ml|l)\b/gi, '');
   
-  // Remove date patterns (MM/DD/YYYY, YYYY-MM-DD)
+  cleaned = cleaned.replace(/\b\d+(\.\d+)?\s*(inch|inches|in|cm|mm|ft|feet)\b/gi, '');
+  
   cleaned = cleaned.replace(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g, '');
   cleaned = cleaned.replace(/\b\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}\b/g, '');
   
-  // Remove UPC/barcode patterns
   cleaned = cleaned.replace(/\bupc[\s:]*([\d\s]+)/gi, '');
   cleaned = cleaned.replace(/\bbarcode[\s:]*([\d\s]+)/gi, '');
   
-  // Remove standalone periods and extra dots
   cleaned = cleaned.replace(/\s*\.\s*\.\s*/g, ' ');
   cleaned = cleaned.replace(/\.\s*$/g, '');
   
-  // Clean up extra whitespace and punctuation
+  cleaned = cleaned.replace(/;\s*\(\s*\)/g, '');
+  cleaned = cleaned.replace(/\(\s*\)/g, '');
+  
   cleaned = cleaned.replace(/\s*[;,]\s*$/g, ''); // trailing semicolons/commas
   cleaned = cleaned.replace(/;\s*;+/g, ''); // double+ semicolons anywhere
   cleaned = cleaned.replace(/;\s*$/g, ''); // trailing semicolons
@@ -122,7 +141,36 @@ const cleanProductTitle = (title) => {
   return cleaned || 'Unknown Product';
 };
 
-// Small helper to fetch JSON via native https to avoid axios timeouts in some environments
+const isNonFoodItem = (productText, titleText) => {
+  const combined = `${productText || ''} ${titleText || ''}`.toLowerCase();
+  
+  const foodIndicators = [
+    'egg', 'eggs', 'milk', 'cheese', 'yogurt', 'butter',
+    'chicken', 'beef', 'pork', 'fish', 'shrimp',
+    'vegetable', 'fruit', 'bread', 'pasta', 'noodle'
+  ];
+  
+  if (foodIndicators.some(food => combined.includes(food))) {
+    const strictNonFoodKeywords = [
+      'aluminium pan', 'aluminum pan', 'milk pan', 'kadai', 'wok', 'skillet',
+      'stainless steel', 'cookware', 'utensil', 'spatula',
+      'cutting board', 'chopping board'
+    ];
+    return strictNonFoodKeywords.some(keyword => combined.includes(keyword));
+  }
+  
+  const nonFoodKeywords = [
+    'aluminium', 'aluminum', 'stainless steel', 'steel',
+    'pan', 'pot', 'kadai', 'wok', 'skillet', 'cookware',
+    'utensil', 'spoon', 'fork', 'knife', 'spatula',
+    'thermos', 'flask',
+    'cutting board', 'chopping board',
+    'serving tray', 'platter'
+  ];
+  
+  return nonFoodKeywords.some(keyword => combined.includes(keyword));
+};
+
 const fetchJson = (url, timeout = 8000) => new Promise((resolve, reject) => {
   const req = https.get(url, { timeout }, (res) => {
     let data = '';
@@ -142,7 +190,6 @@ const fetchJson = (url, timeout = 8000) => new Promise((resolve, reject) => {
   });
 });
 
-// Show recalls and product lookup page
 exports.getRecalls = async (req, res) => {
   try {
     console.log('Query parameters:', req.query);
@@ -159,7 +206,6 @@ exports.getRecalls = async (req, res) => {
     let recalls = [];
     let total = 0;
 
-    // Prepare API filters
     const apiFilters = {
       search: search || '',
       limit: 100,
@@ -167,34 +213,25 @@ exports.getRecalls = async (req, res) => {
     };
     if (category && category !== 'all') {
       apiFilters.category = category;
-    } else if (search && String(search).trim().length > 0) {
-      // Try to infer a category from the search term to improve matching (e.g., "chicken" -> poultry)
-      try {
-        const inferred = recallApiService.determineCategory(search);
-        if (inferred && inferred !== 'other') apiFilters.category = inferred;
-      } catch (infErr) {
-        // ignore
-      }
     }
     if (retailer && retailer !== 'all') apiFilters.retailer = retailer;
 
-    // Helper: keywords per category to support flexible matching
     const categoryKeywords = {
-      poultry: ['chicken','turkey','poultry','hen'],
-      beef: ['beef','steak','burger'],
-      pork: ['pork','bacon','sausage','ham'],
-      seafood: ['fish','salmon','tuna','shrimp','shellfish'],
-      vegetables: ['spinach','lettuce','broccoli','vegetable','carrot','salad'],
-      fruits: ['apple','berry','orange','fruit','melon'],
-      dairy: ['milk','cheese','yogurt','dairy','ice cream'],
-      eggs: ['egg','eggs'],
-      nuts: ['nut','peanut','almond'],
-      grains: ['bread','flour','grain'],
-      snacks: ['cookie','candy','chocolate','snack','chip','cracker','bar','granola','pretzel','popcorn','jerky'],
-      'baby-food': ['baby','infant']
+      poultry: ['chicken','turkey','poultry','hen','duck','goose','quail','pheasant','partridge','grouse','guinea fowl','pheasant','partridge','grouse','guinea fowl'],
+      beef: ['beef','steak','burger', 'ground beef', 'hamburger', 'beef patty', 'burger patty', 'ground beef patty'],
+      pork: ['pork','bacon','sausage','ham', 'pork loin', 'pork chop', 'pork rib', 'pork shoulder', 'pork belly', 'bacon', 'sausage'],
+      seafood: ['fish','salmon','tuna','shrimp','shellfish','crabmeat','krab','imitation crab','crab', 'lobster', 'clam', 'oyster', 'mussel', 'scallop', 'squid', 'shrimp', 'crab'],
+      vegetables: ['spinach','lettuce','broccoli','vegetable','carrot','salad','onion','green onion','scallion', 'spring onion', 'kale', 'cabbage', 'celery', 'pepper', 'tomato', 'potato', 'cucumber', 'zucchini', 'eggplant', 'asparagus', 'chard', 'beetroot', 'radish', 'turnip', 'okra', 'artichoke', 'collard', 'mustard', 'parsley', 'chives', 'fennel', 'leek', 'shallot', 'garlic', 'shallot', 'garlic', 'onion', 'green onion', 'scallion', 'spring onion', 'kale', 'cabbage', 'celery', 'pepper', 'tomato', 'potato', 'cucumber', 'zucchini', 'eggplant', 'asparagus', 'chard', 'beetroot', 'radish', 'turnip', 'okra', 'artichoke', 'collard', 'mustard', 'parsley', 'chives', 'fennel', 'leek', 'shallot', 'garlic'],
+      fruits: ['apple','berry','orange','fruit','melon','cantaloupe','honeydew','watermelon', 'banana', 'grape', 'kiwi', 'mango', 'peach', 'pear', 'pineapple', 'plum', 'pomegranate', 'raspberry', 'strawberry', 'tangerine', 'apricot', 'blueberry', 'blackberry', 'cherry', 'fig', 'grapefruit', 'lemon', 'lime', 'nectarine', 'orange', 'peach', 'pear', 'pineapple', 'plum', 'pomegranate', 'raspberry', 'strawberry', 'tangerine', 'apricot', 'blueberry', 'blackberry', 'cherry', 'fig', 'grapefruit', 'lemon', 'lime', 'nectarine', 'orange', 'peach', 'pear', 'pineapple', 'plum', 'pomegranate', 'raspberry', 'strawberry', 'tangerine', 'apricot', 'blueberry', 'blackberry', 'cherry', 'fig', 'grapefruit', 'lemon', 'lime', 'nectarine', 'orange'],
+      dairy: ['milk','cheese','yogurt','dairy','ice cream', 'cream', 'butter', 'cheese', 'yogurt', 'cream', 'curd'],
+      eggs: ['egg','eggs','egg product','egg products', 'omelet', 'omelette', 'frittata', 'quiche', 'scramble'],
+      nuts: ['nut','peanut','almond','cashew','pistachio','walnut','hazelnut','macadamia','pecan','pistachio','walnut','hazelnut','macadamia','pecan'],
+      grains: ['bread','flour','grain','noodle','noodles','pasta','ramen','burrito','sandwich','wrap', 'bakery','cereal','rice','cracker','tortilla','bagel','bun','muffin','croissant','pretzel'],
+      snacks: ['cookie','candy','chocolate','snack','chip','cracker','bar','granola','pretzel','popcorn','jerky', 'chips', 'popcorn', 'pretzels', 'crackers', 'cookies', 'candy', 'chocolate', 'snacks', 'chips', 'popcorn', 'pretzels', 'crackers', 'cookies', 'candy', 'chocolate', 'snacks'],
+      'baby-food': ['baby','infant','baby food','infant food','baby foods','infant foods','baby food product','infant food product','baby food products','infant food products','baby foods products','infant foods products'],
+      other: ['other','miscellaneous','miscellaneous products','miscellaneous foods','other products','other foods','miscellaneous foods','other foods','miscellaneous foods','other foods','miscellaneous foods']
     };
 
-    // Try live API fetch first but don't block too long
     try {
       const apiPromise = recallApiService.fetchAllRecalls(apiFilters);
       const timeoutMs = 5000; // short wait to keep page load snappy
@@ -205,14 +242,10 @@ exports.getRecalls = async (req, res) => {
         if (apiRecalls && Array.isArray(apiRecalls) && apiRecalls.length > 0) {
         console.log(`Live API returned ${apiRecalls.length} recalls (using live data)`);
 
-        // Apply client-side filters
         if (riskLevel && riskLevel !== 'all') {
           apiRecalls = apiRecalls.filter(r => r.riskLevel === riskLevel);
         }
 
-        // If a search term was provided, additionally filter the API results
-        // by checking title/product/brand/description to ensure terms like
-        // "chicken" match recall titles as well (some API searches can miss matches).
         if (search && String(search).trim().length > 0) {
           const s = String(search).toLowerCase();
           apiRecalls = apiRecalls.filter(r => {
@@ -225,7 +258,6 @@ exports.getRecalls = async (req, res) => {
           });
         }
 
-        // If category selected, ensure API results match category OR contain category keywords
         if (category && category !== 'all') {
           const kws = categoryKeywords[category] || [];
           apiRecalls = apiRecalls.filter(r => {
@@ -234,31 +266,25 @@ exports.getRecalls = async (req, res) => {
             const desc = (r.description || '').toString().toLowerCase();
 
             const matchesKeywords = kws.length > 0 && kws.some(k => title.includes(k) || product.includes(k) || desc.includes(k));
-            // Only accept keyword matches when the recall's category is missing/unknown/other
-            const categoryMissingOrOther = !r.category || r.category === 'other' || r.category === null;
-            return (r.category === category) || (categoryMissingOrOther && matchesKeywords);
+            return (r.category === category) || matchesKeywords;
           });
         }
 
-        // Apply sorting from UI (works on normalized fields)
         try {
           apiRecalls.sort((a, b) => {
             const A = (a[sortBy] === undefined || a[sortBy] === null) ? '' : a[sortBy];
             const B = (b[sortBy] === undefined || b[sortBy] === null) ? '' : b[sortBy];
-            // If sorting by date, coerce to timestamp
             if (sortBy === 'recallDate') {
               const ta = new Date(A).getTime();
               const tb = new Date(B).getTime();
               return (ta === tb) ? 0 : ((ta < tb) ? -1 * sortOrder : 1 * sortOrder);
             }
-            // For strings/numbers fallback
             if (typeof A === 'string' && typeof B === 'string') {
               return A.localeCompare(B) * sortOrder;
             }
             if (typeof A === 'number' && typeof B === 'number') {
               return (A - B) * sortOrder;
             }
-            // final fallback
             return (String(A).localeCompare(String(B))) * sortOrder;
           });
         } catch (sortErr) {
@@ -269,15 +295,12 @@ exports.getRecalls = async (req, res) => {
         const startIndex = (page - 1) * limit;
         recalls = apiRecalls.slice(startIndex, startIndex + limit);
 
-        // Save in background (don't block rendering)
         exports.saveApiResultsToDB(apiRecalls).catch(err => console.error('Failed to save API results to DB:', err.message));
       } else {
         console.log('Live API did not return in time; falling back to DB');
 
-        // Build DB query with flexible category matching
         const dbBase = { isActive: true };
 
-        // Search OR conditions (if search provided)
         const searchOr = [];
         if (search) {
           searchOr.push(
@@ -288,22 +311,13 @@ exports.getRecalls = async (req, res) => {
           );
         }
 
-        // Category matching: either exact category or keywords in title/product/description
         let categoryOr = [];
-        let effectiveCategory = category && category !== 'all' ? category : null;
-        if (!effectiveCategory && search && String(search).trim().length > 0) {
-          try {
-            const inferred = recallApiService.determineCategory(search);
-            if (inferred && inferred !== 'other') effectiveCategory = inferred;
-          } catch (infErr) {}
-        }
+        const effectiveCategory = category && category !== 'all' ? category : null;
 
         if (effectiveCategory) {
           const kws = categoryKeywords[effectiveCategory] || [];
-          // Exact category match
           categoryOr.push({ category: effectiveCategory });
 
-          // Build a fallback that only applies keyword matches when category is missing or 'other'
           const keywordOr = [];
           kws.forEach(k => {
             keywordOr.push({ title: { $regex: k, $options: 'i' } });
@@ -312,17 +326,10 @@ exports.getRecalls = async (req, res) => {
           });
 
           if (keywordOr.length > 0) {
-            const fallbackCondition = {
-              $and: [
-                { $or: [ { category: { $exists: false } }, { category: null }, { category: 'other' } ] },
-                { $or: keywordOr }
-              ]
-            };
-            categoryOr.push(fallbackCondition);
+            categoryOr.push({ $or: keywordOr });
           }
         }
 
-        // Combine into final dbQuery
         let dbQuery = { ...dbBase };
         if (searchOr.length > 0 && categoryOr.length > 0) {
           dbQuery.$and = [ { $or: searchOr }, { $or: categoryOr } ];
@@ -347,7 +354,6 @@ exports.getRecalls = async (req, res) => {
     } catch (apiError) {
       console.error('API fetch error:', apiError.message);
 
-      // On API failure, fallback to DB with flexible category matching
       const dbBase = { isActive: true };
 
       const searchOr = [];
@@ -361,13 +367,7 @@ exports.getRecalls = async (req, res) => {
       }
 
       let categoryOr = [];
-      let effectiveCategory = category && category !== 'all' ? category : null;
-      if (!effectiveCategory && search && String(search).trim().length > 0) {
-        try {
-          const inferred = recallApiService.determineCategory(search);
-          if (inferred && inferred !== 'other') effectiveCategory = inferred;
-        } catch (infErr) {}
-      }
+      const effectiveCategory = category && category !== 'all' ? category : null;
 
       if (effectiveCategory) {
         const kws = categoryKeywords[effectiveCategory] || [];
@@ -381,13 +381,7 @@ exports.getRecalls = async (req, res) => {
         });
 
         if (keywordOr.length > 0) {
-          const fallbackCondition = {
-            $and: [
-              { $or: [ { category: { $exists: false } }, { category: null }, { category: 'other' } ] },
-              { $or: keywordOr }
-            ]
-          };
-          categoryOr.push(fallbackCondition);
+          categoryOr.push({ $or: keywordOr });
         }
       }
 
@@ -410,16 +404,13 @@ exports.getRecalls = async (req, res) => {
         .lean();
 
       recalls = dbResults;
-      // For count, use a simple count on the same query (note: $and/$or supported)
       total = await Recall.countDocuments(dbQuery);
     }
 
-    // Ensure all recalls have required fields with proper fallbacks
     recalls = recalls.map(recall => exports.normalizeRecallData(recall));
 
     const totalPages = Math.ceil(total / limit);
 
-    // Define options arrays - updated to match actual data
     const categoryOptions = [
       { value: 'poultry', label: 'Poultry' },
       { value: 'beef', label: 'Beef' },
@@ -490,7 +481,6 @@ exports.getRecalls = async (req, res) => {
   } catch (error) {
     console.error('Recalls controller error:', error);
     
-    // Provide basic structure for the template even on error
     const categoryOptions = [
       { value: 'poultry', label: 'Poultry' },
       { value: 'vegetables', label: 'Vegetables' }
@@ -539,7 +529,6 @@ exports.getRecalls = async (req, res) => {
   }
 };
 
-// Handle product lookup
 exports.lookupProduct = async (req, res) => {
   try {
     const { barcode, productName } = req.body;
@@ -556,11 +545,9 @@ exports.lookupProduct = async (req, res) => {
     const searchTerm = productName || barcode || '';
     let relatedRecalls = [];
 
-    // Try to fetch product metadata from Open Food Facts (with debug logs)
     let offProduct = null;
     try {
       if (barcode) {
-        // Lookup by barcode
         const offResp = await fetchJson(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(barcode)}.json`, 8000);
         console.log('OFF barcode lookup response status:', offResp && offResp.status);
         if (offResp && offResp.status === 1 && offResp.product) {
@@ -568,13 +555,11 @@ exports.lookupProduct = async (req, res) => {
           console.log('OFF product found by barcode:', offProduct.code || offProduct._id || '(no code)');
         }
       } else if (productName) {
-        // Search by product name (attempt to pick the best candidate)
         const params = new URLSearchParams({ search_terms: productName, search_simple: 1, action: 'process', json: 1, page_size: 8 });
         const offResp = await fetchJson(`https://world.openfoodfacts.org/cgi/search.pl?${params.toString()}`, 8000);
         console.log('OFF search returned products:', offResp && Array.isArray(offResp.products) ? offResp.products.length : 0);
 
         if (offResp && Array.isArray(offResp.products) && offResp.products.length > 0) {
-          // Choose the best product: prefer those with product_name, brands, and code
           const products = offResp.products;
           let best = null;
           let bestScore = -1;
@@ -597,7 +582,6 @@ exports.lookupProduct = async (req, res) => {
       offProduct = null;
     }
 
-    // Search in database first
     if (searchTerm) {
       relatedRecalls = await Recall.find({
         $or: [
@@ -612,14 +596,12 @@ exports.lookupProduct = async (req, res) => {
       .limit(10)
       .lean();
 
-      // If no database results, try API search
       if (relatedRecalls.length === 0) {
         console.log('🔄 No database results, searching APIs...');
         try {
           const apiRecalls = await recallApiService.searchRecalls(searchTerm, 10);
           relatedRecalls = apiRecalls.map(recall => this.normalizeRecallData(recall));
           
-          // Save API results to database for future searches
           if (relatedRecalls.length > 0) {
             try {
               await this.saveApiResultsToDB(relatedRecalls);
@@ -633,7 +615,6 @@ exports.lookupProduct = async (req, res) => {
       }
     }
 
-    // Normalize recall data
     relatedRecalls = relatedRecalls.map(recall => this.normalizeRecallData(recall));
 
     const safetyInfo = relatedRecalls.length > 0 ? {
@@ -652,17 +633,14 @@ exports.lookupProduct = async (req, res) => {
       recommendedAction: 'Continue normal use while monitoring for updates.'
     };
 
-    // Build product payload favoring OpenFoodFacts when available
     let productName_clean = productName || 'Product Lookup';
     let brandName = 'N/A';
     let productBarcode = barcode || 'N/A';
     let productIngredients = 'N/A';
     
     if (offProduct) {
-      // Extract and clean product name
       productName_clean = offProduct.product_name || offProduct.generic_name || offProduct.abbreviated_product_name || productName_clean;
       
-      // Extract brand (OFF sometimes has comma-separated brands)
       if (offProduct.brands) {
         const brandList = String(offProduct.brands).split(',').map(b => b.trim()).filter(Boolean);
         brandName = brandList[0] || 'N/A';
@@ -670,13 +648,10 @@ exports.lookupProduct = async (req, res) => {
         brandName = offProduct.brands_tags[0].replace(/^en:/, '').trim();
       }
       
-      // Extract barcode
       productBarcode = offProduct.code || offProduct._id || productBarcode;
       
-      // Extract ingredients
       productIngredients = offProduct.ingredients_text || offProduct.ingredients_text_with_allergens || productIngredients;
     } else if (relatedRecalls && relatedRecalls.length > 0) {
-      // Fallback to recall data if OFF didn't return anything
       brandName = relatedRecalls[0].brand || 'N/A';
     }
     
@@ -690,16 +665,13 @@ exports.lookupProduct = async (req, res) => {
       searchTerm: searchTerm
     };
 
-    // Parse allergens
     if (offProduct) {
       if (Array.isArray(offProduct.allergens_tags) && offProduct.allergens_tags.length > 0) {
         productPayload.allergens = offProduct.allergens_tags.map(a => a.replace('en:', '').replace('en', '').replace(/^:/, '')).filter(Boolean);
       } else if (offProduct.allergens) {
-        // sometimes a comma separated string
         productPayload.allergens = String(offProduct.allergens).split(',').map(s => s.trim()).filter(Boolean);
       }
 
-      // Nutrition
       if (offProduct.nutriments) {
         productPayload.nutritionFacts = {
           calories: offProduct.nutriments['energy-kcal_100g'] || offProduct.nutriments['energy-kcal'] || offProduct.nutriments['energy_100g'] || null,
@@ -735,24 +707,18 @@ exports.lookupProduct = async (req, res) => {
   }
 };
 
-// Get single recall details
 exports.getRecall = async (req, res) => {
   try {
     let recall = await Recall.findById(req.params.id).lean();
     
-    // If recall not found in DB, try to fetch from API
     if (!recall) {
       console.log(`Recall ${req.params.id} not in DB, checking APIs...`);
       
-      // This would need additional logic to map IDs between systems
-      // For now, redirect to recalls page
       return res.redirect('/recalls');
     }
 
-    // Normalize recall data
     recall = this.normalizeRecallData(recall);
 
-    // Find related recalls
     const relatedRecalls = await Recall.find({
       _id: { $ne: recall._id },
       $or: [
@@ -778,7 +744,6 @@ exports.getRecall = async (req, res) => {
   }
 };
 
-// API endpoint for external consumers
 exports.apiGetRecalls = async (req, res) => {
   try {
     const { 
@@ -793,7 +758,6 @@ exports.apiGetRecalls = async (req, res) => {
     let recalls = [];
 
     if (source === 'db' || source === 'all') {
-      // Database query
       const dbQuery = { isActive: true };
       
       if (search) {
@@ -813,7 +777,6 @@ exports.apiGetRecalls = async (req, res) => {
         .lean();
     }
 
-    // If no DB results or specifically requesting API, use API
     if ((recalls.length === 0 && source === 'all') || source === 'api') {
       try {
         const apiFilters = { 
@@ -832,7 +795,6 @@ exports.apiGetRecalls = async (req, res) => {
       }
     }
 
-    // Normalize all recall data
     recalls = recalls.map(recall => this.normalizeRecallData(recall));
 
     res.json({
@@ -855,7 +817,6 @@ exports.apiGetRecalls = async (req, res) => {
   }
 };
 
-// Sync recalls from APIs to database
 exports.syncRecalls = async (req, res) => {
   try {
     console.log('🔄 Manual recall sync requested');
@@ -884,19 +845,15 @@ exports.syncRecalls = async (req, res) => {
   }
 };
 
-// Helper method to normalize recall data
 exports.normalizeRecallData = (recall) => {
   if (!recall) return null;
 
-  // Ensure recallDate is a valid Date object
   let recallDate;
   try {
-    // Accept several possible date formats: Date object, ISO string, or FDA's YYYYMMDD numeric string
     let rawDate = recall.recallDate || recall.releaseDate || recall.date || recall.recall_initiation_date || recall.report_date || null;
 
     if (rawDate && typeof rawDate === 'number') rawDate = String(rawDate);
 
-    // Handle YYYYMMDD strings (e.g. '20250920')
     if (rawDate && typeof rawDate === 'string' && /^\d{8}$/.test(rawDate)) {
       const y = rawDate.slice(0,4);
       const m = rawDate.slice(4,6);
@@ -909,7 +866,6 @@ exports.normalizeRecallData = (recall) => {
     }
 
     if (!recallDate || isNaN(recallDate.getTime())) {
-      // fallback: if rawData contains FDA fields, try those
       const alt = (recall && recall.rawData) ? (recall.rawData.recall_initiation_date || recall.rawData.report_date) : null;
       if (alt && /^\d{8}$/.test(String(alt))) {
         const s = String(alt);
@@ -924,7 +880,6 @@ exports.normalizeRecallData = (recall) => {
     recallDate = new Date(); // Fallback to current date
   }
 
-  // Generate article link if not provided
   let articleLink = recall.articleLink || recall.url;
   if (!articleLink || articleLink === '#') {
     const agency = recall.agency || 'FDA';
@@ -935,124 +890,181 @@ exports.normalizeRecallData = (recall) => {
     if (agency === 'FSIS') {
       articleLink = `https://www.fsis.usda.gov/recalls-alerts/${brandSlug}-recalls-${productSlug}-due-${reasonSlug}`;
     } else {
-      articleLink = `https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts/${brandSlug}-recalls-${productSlug}-due-${reasonSlug}`;
+      const recallNum = recall.recall_number || recall.recallId || (recall.rawData && (recall.rawData.recall_number || recall.rawData.recallNumber));
+      const searchQ = (recallNum && String(recallNum).trim()) ? String(recallNum).trim() : `${(recall.brand || '')} ${(recall.product || recall.title || '')}`;
+      const fdaSearch = `https://www.fda.gov/search?search_api_fulltext=${encodeURIComponent(searchQ)}&site=Food`;
+      articleLink = fdaSearch;
     }
   }
 
-  // Normalize retailer to a slug that matches schema options where possible
   const possibleRetailer = recall.retailer || recall.recalling_firm || recall.retailerName || '';
   let retailerSlug = (possibleRetailer || 'various-retailers').toString().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   if (!retailerSlug) retailerSlug = 'various-retailers';
-  // whitelist known retailer slugs; fallback to 'various-retailers' if unknown
   const allowedRetailers = ['trader-joes','whole-foods','kroger','walmart','costco','target','safeway','albertsons','various-retailers'];
   if (!allowedRetailers.includes(retailerSlug)) retailerSlug = 'various-retailers';
 
-  // Clean product and brand strings
   const rawProduct = (recall.product || recall.product_description || recall.title || '').toString();
   const rawBrand = (recall.brand || recall.recalling_firm || recall.Firm || '').toString();
   
   let cleanedProduct = cleanProductTitle(rawProduct);
   let cleanedBrand = cleanBrandName(rawBrand);
   
-  // Check if product already contains a brand name at the start
-  // Look for common brand patterns: 2-3 capitalized words at the beginning
   const productLower = cleanedProduct.toLowerCase();
   const brandLower = cleanedBrand.toLowerCase();
   
-  // Extract potential brand from product if it looks like "Brand Name Product Description"
-  const brandPattern = /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\s+/;
-  const brandMatch = cleanedProduct.match(brandPattern);
+  const allCapsBrandPattern = /^([A-Z][A-Z\s]+?)\s+-\s+/;  // Matches "SILVER HORSE - "
+  const titleCaseBrandPattern = /^([A-Z][a-z]+\s+[A-Z][a-z]+)\s+/;
   
   let extractedBrand = null;
+  
+  let brandMatch = cleanedProduct.match(allCapsBrandPattern);
   if (brandMatch) {
-    const potentialBrand = brandMatch[1];
-    // Common food brands that might appear (this is a heuristic)
-    const knownBrands = ['cabot', 'kraft', 'nestle', 'kellogg', 'general mills', 'post', 'quaker', 'nabisco', 'pepperidge', 'tyson'];
-    if (knownBrands.some(kb => potentialBrand.toLowerCase().includes(kb))) {
-      extractedBrand = potentialBrand;
-      cleanedProduct = cleanedProduct.substring(potentialBrand.length).trim();
-      // Use extracted brand if current brand looks like a distributor or is generic
-      if (brandLower.includes('inc') || brandLower.includes('llc') || brandLower.includes('foods')) {
-        cleanedBrand = extractedBrand;
+    extractedBrand = brandMatch[1].trim();
+    cleanedProduct = cleanedProduct.substring(brandMatch[0].length).trim();
+    if (brandLower.includes('inc') || brandLower.includes('llc') || brandLower.includes('group') || brandLower.includes('corp')) {
+      cleanedBrand = extractedBrand;
+    }
+  } else {
+    brandMatch = cleanedProduct.match(titleCaseBrandPattern);
+    if (brandMatch) {
+      const potentialBrand = brandMatch[1];
+      const knownBrands = ['cabot creamery', 'kraft foods', 'nestle', 'general mills', 'quaker oats', 'pepperidge farm', 'tyson foods', 'echo lake'];
+      const potLower = potentialBrand.toLowerCase();
+      
+      if (knownBrands.some(kb => potLower === kb || potLower.startsWith(kb))) {
+        extractedBrand = potentialBrand;
+        cleanedProduct = cleanedProduct.substring(potentialBrand.length).trim();
+        if (brandLower.includes('inc') || brandLower.includes('llc') || brandLower.includes('foods') || brandLower.includes('jody')) {
+          cleanedBrand = extractedBrand;
+        }
       }
     }
   }
   
-  // If cleaned product starts with the current brand name, split them
-  if (brandLower !== 'unknown brand' && productLower.startsWith(brandLower)) {
-    cleanedProduct = cleanedProduct.substring(cleanedBrand.length).trim();
-  }
-  
-  // Also check if brand appears at the start of product (word boundary)
-  const brandWords = cleanedBrand.split(/\s+/).filter(w => w.length > 2);
-  if (brandWords.length > 0) {
-    const firstBrandWord = brandWords[0].toLowerCase();
-    if (productLower.startsWith(firstBrandWord)) {
-      // Check if multiple brand words match
-      let matchedLength = 0;
+  if (!extractedBrand && brandLower !== 'unknown brand') {
+    const brandWords = cleanedBrand.split(/\s+/).filter(w => w.length > 2);
+    if (brandWords.length > 0 && productLower.startsWith(brandWords[0].toLowerCase())) {
+      let matchedChars = 0;
+      let matchedWords = 0;
       for (const word of brandWords) {
-        const regex = new RegExp(`^${word}\\s*`, 'i');
-        const remaining = cleanedProduct.substring(matchedLength);
-        if (regex.test(remaining)) {
-          matchedLength += remaining.match(regex)[0].length;
+        const regex = new RegExp(`^${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*`, 'i');
+        const remaining = cleanedProduct.substring(matchedChars);
+        const match = remaining.match(regex);
+        if (match) {
+          matchedChars += match[0].length;
+          matchedWords++;
         } else {
           break;
         }
       }
-      if (matchedLength > 0) {
-        cleanedProduct = cleanedProduct.substring(matchedLength).trim();
+      if (matchedWords >= Math.min(2, brandWords.length)) {
+        cleanedProduct = cleanedProduct.substring(matchedChars).trim();
       }
     }
   }
   
-  // Build title from cleaned product and brand in format: "Product — Brand"
   const titleParts = [];
   if (cleanedProduct && cleanedProduct !== 'Unknown Product') titleParts.push(cleanedProduct);
   if (cleanedBrand && cleanedBrand !== 'Unknown Brand' && cleanedBrand !== cleanedProduct) titleParts.push(cleanedBrand);
-  const finalTitle = titleParts.length > 0 ? titleParts.join(' — ') : (recall.title || 'Product Recall');
+  let finalTitle = titleParts.length > 0 ? titleParts.join(' — ') : (recall.title || 'Product Recall');
+  
+  finalTitle = finalTitle
+    .split(' ')
+    .map((word, index) => {
+      const cleanWord = word.replace(/[,\.;:!?]$/g, '');
+      const punctuation = word.slice(cleanWord.length);
+      
+      const lowercaseWords = ['a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'from', 'in', 'into', 'of', 'on', 'or', 'the', 'to', 'with', 'per', 'dz'];
+      if (index > 0 && lowercaseWords.includes(cleanWord.toLowerCase())) {
+        return cleanWord.toLowerCase() + punctuation;
+      }
+      
+      if (cleanWord === cleanWord.toUpperCase() && cleanWord.length >= 2 && cleanWord.length <= 3 && /^[A-Z]+$/.test(cleanWord) && !lowercaseWords.includes(cleanWord.toLowerCase())) {
+        return word;
+      }
+      
+      if (cleanWord.includes("'") || cleanWord.includes("'")) {
+        return cleanWord.split(/([''])/).map((part, i) => {
+          if (part === "'" || part === "'") return part;
+          if (i === 0) return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+          return part.toLowerCase();
+        }).join('') + punctuation;
+      }
+      
+      return cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1).toLowerCase() + punctuation;
+    })
+    .join(' ');
 
   return {
-    // Core identification
     _id: recall._id,
     recallId: recall.recallId || recall.recall_number || `RECALL-${Date.now()}`,
     
-    // Product information
     title: finalTitle,
     description: recall.description || recall.reason_for_recall || 'No description available',
     product: cleanedProduct,
     brand: cleanedBrand,
     reason: recall.reason || recall.reason_for_recall || 'Not specified',
     
-    // Categorization
-    category: recall.category || 'other',
+    category: (() => {
+      const allowed = ['poultry','beef','pork','seafood','vegetables','fruits','dairy','eggs','nuts','grains','snacks','baby-food','other'];
+
+      if (isNonFoodItem(cleanedProduct, finalTitle)) {
+        return 'other';
+      }
+
+      const combined = `${cleanedProduct} ${finalTitle}`.toLowerCase();
+
+      let inferred = null;
+
+      if (/\bnoodle\b|\bpasta\b/i.test(combined)) inferred = 'grains';
+
+      if (!inferred && /\bburrito\b|\bbreakfast\ssandwich\b|\bbreakfast\swrap\b|\bsandwich\b|\bwrap\b/i.test(combined)) inferred = 'grains';
+
+      if (!inferred && /\bpopcorn\b|\bsnack\b/i.test(combined)) inferred = 'snacks';
+
+      if (!inferred && /\b(chicken\s+)?eggs?\b|shell\s+eggs?\b|egg\s+product/i.test(combined) && !/burrito|noodle|pasta|sandwich|wrap/i.test(combined)) inferred = 'eggs';
+
+      if (!inferred) {
+        if (/\bmilk\b|\bcheese\b|\byogurt\b|\bdairy\b/i.test(combined)) inferred = 'dairy';
+        else if (/\bchicken\b|\bturkey\b|\bpoultry\b/i.test(combined)) inferred = 'poultry';
+        else if (/\bbeef\b|\bsteak\b/i.test(combined)) inferred = 'beef';
+        else if (/\bpork\b|\bbacon\b|\bsausage\b/i.test(combined)) inferred = 'pork';
+        else if (/\bfish\b|\bshrimp\b|\bseafood\b|\bsalmon\b/i.test(combined)) inferred = 'seafood';
+        else if (/\bfruit\b|\bapple\b|\borange\b|\bberry\b|\bmelon\b|\bcantaloupe\b|\bhoneydew\b|\bwatermelon\b/i.test(combined)) inferred = 'fruits';
+        else if (/\bvegetable\b|\blettuce\b|\bspinach\b|\bsalad\b|\bonion\b|\bgreen\s+onion\b|\bscallion\b|\bspring\s+onion\b/i.test(combined)) inferred = 'vegetables';
+        else if (/\bbread\b|\bgrain\b/i.test(combined)) inferred = 'grains';
+        else if (/\b(nut|peanut|almond)\b/i.test(combined)) inferred = 'nuts';
+        else if (/\bbaby\b|\binfant\b/i.test(combined)) inferred = 'baby-food';
+      }
+
+      const existing = (recall.category || '').toString().toLowerCase();
+      if (existing && allowed.includes(existing)) return existing;
+
+      if (inferred && allowed.includes(inferred)) return inferred;
+
+      return 'other';
+    })(),
     riskLevel: recall.riskLevel || 'medium',
     retailer: retailerSlug,
     
-    // Agency and status
     agency: recall.agency || 'FDA',
     status: recall.status || 'Ongoing',
     source: recall.source || 'database',
     
-    // Distribution
     distribution: recall.distribution || recall.distribution_pattern || 'Nationwide',
     statesAffected: Array.isArray(recall.statesAffected) ? recall.statesAffected : 
                    (recall.states ? [recall.states] : ['Nationwide']),
     
-    // Dates
     recallDate: recallDate,
     
-    // External link
     articleLink: articleLink,
     
-    // System fields
     isActive: recall.isActive !== undefined ? recall.isActive : true,
     
-    // Raw data for debugging
     ...(process.env.NODE_ENV === 'development' && { _raw: recall })
   };
 };
 
-// Helper method to save API results to database
 exports.saveApiResultsToDB = async (apiRecalls) => {
   if (!apiRecalls || !Array.isArray(apiRecalls)) return 0;
   
@@ -1062,7 +1074,6 @@ exports.saveApiResultsToDB = async (apiRecalls) => {
     try {
       const normalizedRecall = this.normalizeRecallData(apiRecall);
       
-      // Check if recall already exists
       const existingRecall = await Recall.findOne({
         recallId: normalizedRecall.recallId
       });
@@ -1071,7 +1082,6 @@ exports.saveApiResultsToDB = async (apiRecalls) => {
         await Recall.create(normalizedRecall);
         savedCount++;
       } else {
-        // Update existing recall
         await Recall.updateOne(
           { recallId: normalizedRecall.recallId },
           { $set: normalizedRecall }
@@ -1079,7 +1089,6 @@ exports.saveApiResultsToDB = async (apiRecalls) => {
       }
     } catch (error) {
       console.error('❌ Error saving recall to DB:', error.message);
-      // Continue with next recall
     }
   }
   
@@ -1087,14 +1096,50 @@ exports.saveApiResultsToDB = async (apiRecalls) => {
   return savedCount;
 };
 
-// Server-side endpoint to fetch recent FDA recall news (proxy to avoid client CORS)
+exports.reNormalizeAllRecalls = async () => {
+  try {
+    console.log('🔄 Starting re-normalization of all recalls in database...');
+    
+    const allRecalls = await Recall.find({}).lean();
+    console.log(`📊 Found ${allRecalls.length} recalls to process`);
+    
+    let updatedCount = 0;
+    
+    for (const recall of allRecalls) {
+      try {
+        const normalized = this.normalizeRecallData(recall);
+        
+        await Recall.updateOne(
+          { _id: recall._id },
+          { $set: {
+            title: normalized.title,
+            product: normalized.product,
+            brand: normalized.brand,
+            description: normalized.description,
+            reason: normalized.reason,
+            category: normalized.category
+          }}
+        );
+        
+        updatedCount++;
+      } catch (err) {
+        console.error(`❌ Failed to update recall ${recall._id}:`, err.message);
+      }
+    }
+    
+    console.log(`✅ Re-normalized ${updatedCount} recalls`);
+    return updatedCount;
+  } catch (error) {
+    console.error('❌ Re-normalization error:', error);
+    return 0;
+  }
+};
+
 exports.getNews = async (req, res) => {
   try {
-    // Use the recall API service to fetch FDA recalls (limit 20, last 12 months)
     const recallApi = require('../services/recallAPI');
     const fdaRecalls = await recallApi.fetchFDARecalls({ limit: 20, monthsBack: 12 });
 
-    // Normalize each recall so the client has consistent fields (articleLink, title, reason, recallDate)
     const normalized = (Array.isArray(fdaRecalls) ? fdaRecalls : []).map(r => exports.normalizeRecallData(r));
 
     return res.json({ success: true, results: normalized });

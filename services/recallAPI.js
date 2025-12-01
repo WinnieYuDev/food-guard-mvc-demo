@@ -10,7 +10,6 @@ class RecallApiService {
     const { limit = 50, search = '', monthsBack = 5 } = options;
     try {
 
-      // Build FDA openFDA search query
       const queryParts = [];
 
       if (monthsBack) {
@@ -24,7 +23,6 @@ class RecallApiService {
 
       if (search && String(search).trim() !== '') {
         const s = String(search).replace(/"/g, '').trim();
-        // Search several common fields
         const sub = [`product_description:"${s}"`, `recalling_firm:"${s}"`, `reason_for_recall:"${s}"`].join('+OR+');
         queryParts.push(`(${sub})`);
       }
@@ -44,7 +42,6 @@ class RecallApiService {
       return this.transformFDAData(results);
     } catch (error) {
       console.error('❌ FDA API Error (primary query):', error.response?.status, error.message);
-      // Retry with a simpler query (no date range or search) which often succeeds
       try {
         const fallbackUrl = `${this.fdaBaseUrl}?limit=${Math.min(limit, 100)}&sort=report_date:desc`;
         console.log('🌐 FDA fallback API call (simple):', fallbackUrl);
@@ -60,7 +57,6 @@ class RecallApiService {
     }
   }
 
-  // Search both FDA and FSIS for a given search term (used by product lookup)
   async searchRecalls(searchTerm, limit = 20) {
     try {
       const filters = { search: searchTerm, limit, monthsBack: 12 };
@@ -73,7 +69,6 @@ class RecallApiService {
       if (fdaRes.status === 'fulfilled') results.push(...fdaRes.value);
       if (fsisRes.status === 'fulfilled') results.push(...fsisRes.value);
 
-      // Sort by date and limit
       results = results.sort((a, b) => new Date(b.recallDate) - new Date(a.recallDate)).slice(0, limit);
       return results;
     } catch (error) {
@@ -98,7 +93,6 @@ class RecallApiService {
 
       let results = response.data || [];
       
-      // Filter for recent recalls if we have date data
       if (monthsBack && results.length > 0) {
         const cutoffDate = new Date();
         cutoffDate.setMonth(cutoffDate.getMonth() - monthsBack);
@@ -109,8 +103,6 @@ class RecallApiService {
         });
       }
       
-      // Apply limit
-      // If a search term is provided, apply a simple text filter against a few fields
       if (search && String(search).trim() !== '') {
         const s = String(search).toLowerCase();
         results = results.filter(r => {
@@ -143,7 +135,6 @@ class RecallApiService {
 
       const recalls = [];
 
-      // Process FDA results
       if (fdaRecalls.status === 'fulfilled') {
         recalls.push(...fdaRecalls.value);
         console.log(`FDA: ${fdaRecalls.value.length} recalls`);
@@ -151,7 +142,6 @@ class RecallApiService {
         console.log('❌ FDA API failed');
       }
 
-      // Process FSIS results
       if (fsisRecalls.status === 'fulfilled') {
         recalls.push(...fsisRecalls.value);
         console.log(`FSIS: ${fsisRecalls.value.length} recalls`);
@@ -161,7 +151,6 @@ class RecallApiService {
 
       console.log(`📊 Total API recalls: ${recalls.length}`);
       
-      // If both APIs failed, use mock data
       if (recalls.length === 0) {
         console.log('Both APIs failed, using mock data');
         return this.getMockRecalls(filters);
@@ -177,13 +166,10 @@ class RecallApiService {
     }
   }
 
-  // Helper to parse FSIS date formats
   parseFSISDate(dateString) {
     if (!dateString) return new Date();
     
-    // Try different date formats that FSIS might use
     try {
-      // Format: "MM/DD/YYYY" or "YYYY-MM-DD"
       if (dateString.includes('/')) {
         const [month, day, year] = dateString.split('/');
         return new Date(year, month - 1, day);
@@ -199,7 +185,6 @@ class RecallApiService {
     if (!Array.isArray(fdaData)) return [];
     
     return fdaData.map(recall => {
-      // Handle various FDA field names
       const productName = recall.product_description || 'Unknown FDA Product';
       const reason = recall.reason_for_recall || 'Not specified';
       const recallDate = recall.recall_initiation_date || recall.report_date || new Date().toISOString();
@@ -229,24 +214,18 @@ class RecallApiService {
   transformFSISData(fsisData) {
     if (!Array.isArray(fsisData)) return [];
     return fsisData.map(recall => {
-      // FSIS API sometimes returns fields with `field_` prefixes or PascalCase
       const productName = recall.Product || recall.product_name || recall.field_title || recall.field_product_items || recall.field_summary || 'Unknown FSIS Product';
-      // Try multiple reason fields
       const reason = recall.Reason || recall.reason || recall.field_recall_reason || recall.field_summary || 'Not specified';
-      // Dates
       const recallDateRaw = recall.ReleaseDate || recall.Date || recall.field_recall_date || recall.field_last_modified_date || recall.recall_date || new Date().toISOString();
       const company = recall.Firm || recall.establishment || recall.field_establishment || recall.company || 'Unknown Company';
       const recallNumber = recall.RecallNumber || recall.recall_number || recall.field_recall_number || `FSIS-${Date.now()}`;
 
-      // Prefer extracting a concise product title from product items or field_title
       let conciseProduct = productName;
       if (typeof conciseProduct === 'string' && conciseProduct.length > 250) {
-        // If it's long HTML summary, try extracting first sentence
         const plain = conciseProduct.replace(/<[^>]*>/g, '').trim();
         conciseProduct = plain.split(/[\.\n]/)[0];
       }
 
-      // Distribution: try FSIS-specific fields
       const distribution = recall.Distribution || recall.distribution || recall.field_distro_list || recall.field_states || 'Nationwide';
 
       return {
@@ -283,7 +262,6 @@ class RecallApiService {
       return ['Multiple States'];
     }
     
-    // Extract state abbreviations (simple pattern matching)
     const stateAbbreviations = [
       'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
       'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
@@ -307,7 +285,6 @@ class RecallApiService {
     
     const reasonLower = String(reason).toLowerCase();
     
-    // High risk pathogens
     if (reasonLower.includes('salmonella') || 
         reasonLower.includes('e. coli') || 
         reasonLower.includes('listeria') ||
@@ -318,7 +295,6 @@ class RecallApiService {
       return 'high';
     }
     
-    // Medium risk - allergens, quality issues
     if (reasonLower.includes('allergen') || 
         reasonLower.includes('undeclared') ||
         reasonLower.includes('mislabel') ||
@@ -329,7 +305,6 @@ class RecallApiService {
       return 'medium';
     }
     
-    // Low risk - quality, packaging, minor issues
     return 'low';
   }
 
@@ -337,46 +312,40 @@ class RecallApiService {
     if (!productDescription) return 'other';
     
     const descLower = String(productDescription).toLowerCase();
-    
-    // Protein categories
-    if (descLower.includes('chicken') || descLower.includes('turkey') || descLower.includes('poultry') || descLower.includes('hen')) 
-      return 'poultry';
-    if (descLower.includes('beef') || descLower.includes('steak') || descLower.includes('burger')) 
-      return 'beef';
-    if (descLower.includes('pork') || descLower.includes('bacon') || descLower.includes('sausage') || descLower.includes('ham')) 
-      return 'pork';
-    if (descLower.includes('fish') || descLower.includes('salmon') || descLower.includes('tuna') || descLower.includes('seafood') || descLower.includes('shrimp')) 
-      return 'seafood';
-    
-    // Snacks (prefer snack classification for items like chips, cookies, bars)
-    if (descLower.includes('cookie') || descLower.includes('candy') || descLower.includes('chocolate') || descLower.includes('snack') || descLower.includes('chip') || descLower.includes('cracker') || descLower.includes('bar') || descLower.includes('granola') || descLower.includes('pretzel') || descLower.includes('popcorn') || descLower.includes('jerky'))
-      return 'snacks';
+    const kw = (s) => new RegExp(`\\b${s}\\b`, 'i');
 
-    // Produce categories
-    if (descLower.includes('spinach') || descLower.includes('lettuce') || descLower.includes('broccoli') || descLower.includes('vegetable') || descLower.includes('carrot')) 
-      return 'vegetables';
-    if (descLower.includes('apple') || descLower.includes('berry') || descLower.includes('orange') || descLower.includes('fruit') || descLower.includes('melon')) 
-      return 'fruits';
-    
-    // Dairy categories
-    if (descLower.includes('milk') || descLower.includes('cheese') || descLower.includes('yogurt') || descLower.includes('dairy') || descLower.includes('ice cream')) 
-      return 'dairy';
-    if (descLower.includes('egg')) 
-      return 'eggs';
-    
-    // Other categories
-    if (descLower.includes('nut') || descLower.includes('peanut') || descLower.includes('almond')) 
-      return 'nuts';
-    if (descLower.includes('bread') || descLower.includes('flour') || descLower.includes('grain')) 
-      return 'grains';
-    
-    if (descLower.includes('baby') || descLower.includes('infant')) 
-      return 'baby-food';
-    
+    const seafoodList = ['imitation crab', 'crabmeat', 'krab', 'crab', 'shrimp', 'prawn', 'lobster', 'oyster', 'mussel', 'scallop', 'clam', 'fish', 'salmon', 'tuna', 'cod', 'pollock'];
+    if (seafoodList.some(k => descLower.includes(k))) return 'seafood';
+
+    const grainsList = ['burrito', 'wrap', 'sandwich', 'noodle', 'pasta', 'ramen', 'bread', 'flour', 'tortilla', 'bagel', 'bun', 'muffin', 'croissant', 'cereal', 'rice', 'cracker', 'tortilla'];
+    if (grainsList.some(k => descLower.includes(k))) return 'grains';
+
+    const snacksList = ['cookie','biscuit','candy','chocolate','snack','chip','cracker','bar','granola','pretzel','popcorn','jerky'];
+    if (snacksList.some(k => descLower.includes(k))) return 'snacks';
+
+    const dairyList = ['milk','cheese','yogurt','dairy','ice cream','cream','butter'];
+    if (dairyList.some(k => descLower.includes(k))) return 'dairy';
+
+    if (kw('egg').test(descLower) || kw('eggs').test(descLower) || descLower.includes('egg product')) return 'eggs';
+
+    if (descLower.includes('chicken') || descLower.includes('turkey') || descLower.includes('poultry') || descLower.includes('hen') || descLower.includes('duck') || descLower.includes('quail')) return 'poultry';
+    if (descLower.includes('beef') || descLower.includes('steak') || descLower.includes('burger') || descLower.includes('ground beef')) return 'beef';
+    if (descLower.includes('pork') || descLower.includes('bacon') || descLower.includes('sausage') || descLower.includes('ham')) return 'pork';
+
+    const vegList = ['spinach','lettuce','broccoli','vegetable','carrot','onion','green onion','scallion','spring onion','leek','shallot','garlic','kale','cabbage','tomato','potato','cucumber','zucchini','eggplant','asparagus','pepper','celery','radish','turnip','okra','artichoke'];
+    if (vegList.some(k => descLower.includes(k))) return 'vegetables';
+
+    const fruitList = ['apple','berry','orange','fruit','melon','cantaloupe','honeydew','watermelon','banana','grape','kiwi','mango','peach','pear','pineapple'];
+    if (fruitList.some(k => descLower.includes(k))) return 'fruits';
+
+    const nutList = ['nut','peanut','almond','cashew','pistachio','walnut','hazelnut','macadamia','pecan'];
+    if (nutList.some(k => descLower.includes(k))) return 'nuts';
+
+    if (descLower.includes('baby') || descLower.includes('infant')) return 'baby-food';
+
     return 'other';
   }
 
-  // Mock data for fallback
   getMockRecalls(filters = {}) {
     const currentDate = new Date();
     const mockRecalls = [
@@ -433,7 +402,6 @@ class RecallApiService {
       }
     ];
 
-    // Apply basic filtering to mock data
     let filtered = mockRecalls;
     
     if (filters.search) {
@@ -448,14 +416,12 @@ class RecallApiService {
     return filtered.slice(0, filters.limit || 50);
   }
 
-  // Health check method
   async healthCheck() {
     const results = {
       fda: { status: 'unknown', responseTime: 0, error: null },
       fsis: { status: 'unknown', responseTime: 0, error: null }
     };
 
-    // Test FDA API
     try {
       const startTime = Date.now();
       await axios.get(`${this.fdaBaseUrl}?limit=1`, { timeout: 5000 });
@@ -466,7 +432,6 @@ class RecallApiService {
       results.fda.error = error.message;
     }
 
-    // Test FSIS API
     try {
       const startTime = Date.now();
       await axios.get(this.fsisBaseUrl, { timeout: 5000 });

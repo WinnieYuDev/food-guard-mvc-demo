@@ -1,16 +1,11 @@
-// FoodGuard - Main JavaScript File
-// This file handles general site functionality and utilities
 
-// Wait for the DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize all main functionality
     initializeMobileMenu();
     initializeFlashMessages();
     initializeFormValidation();
     initializeLikeButtons();
 });
 
-// Mobile menu functionality
 function initializeMobileMenu() {
     const mobileMenuButton = document.getElementById('mobileMenuButton');
     const sidebar = document.querySelector('aside');
@@ -29,7 +24,6 @@ function initializeMobileMenu() {
     }
 }
 
-// Auto-hide flash messages after 5 seconds
 function initializeFlashMessages() {
     const flashMessages = document.querySelectorAll('[class*="bg-"].border');
     
@@ -46,7 +40,6 @@ function initializeFlashMessages() {
     });
 }
 
-// Basic form validation
 function initializeFormValidation() {
     const forms = document.querySelectorAll('form');
     
@@ -72,21 +65,17 @@ function initializeFormValidation() {
     });
 }
 
-// Highlight field with error
 function highlightFieldError(field) {
     field.classList.add('border-red-500');
     field.classList.remove('border-gray-300');
 }
 
-// Clear field error highlighting
 function clearFieldError(field) {
     field.classList.remove('border-red-500');
     field.classList.add('border-gray-300');
 }
 
-// Show form error message
 function showFormError(message) {
-    // Create error message element
     const errorDiv = document.createElement('div');
     errorDiv.className = 'mb-4 p-4 bg-red-50 border border-red-200 rounded-lg';
     errorDiv.innerHTML = `
@@ -98,12 +87,10 @@ function showFormError(message) {
         </div>
     `;
     
-    // Insert at the top of the form
     const form = document.querySelector('form');
     if (form) {
         form.insertBefore(errorDiv, form.firstChild);
         
-        // Auto-remove after 5 seconds
         setTimeout(() => {
             if (errorDiv.parentNode) {
                 errorDiv.parentNode.removeChild(errorDiv);
@@ -112,18 +99,15 @@ function showFormError(message) {
     }
 }
 
-// Like button functionality with visual feedback
 function initializeLikeButtons() {
     const likeButtons = document.querySelectorAll('form[action*="/like"] button');
     
     likeButtons.forEach(button => {
         button.addEventListener('click', function(e) {
-            // Add visual feedback
             const originalHTML = button.innerHTML;
             button.innerHTML = '<span class="animate-pulse">❤️</span>';
             button.disabled = true;
             
-            // Revert after a short delay
             setTimeout(() => {
                 button.innerHTML = originalHTML;
                 button.disabled = false;
@@ -132,12 +116,10 @@ function initializeLikeButtons() {
     });
 }
 
-// Utility function for confirmation dialogs
 function confirmAction(message) {
     return confirm(message || 'Are you sure you want to proceed?');
 }
 
-// Utility function for loading states
 function setLoadingState(element, isLoading) {
     if (isLoading) {
         element.disabled = true;
@@ -155,7 +137,6 @@ function setLoadingState(element, isLoading) {
     }
 }
 
-// Export functions for use in other modules (if needed)
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         confirmAction,

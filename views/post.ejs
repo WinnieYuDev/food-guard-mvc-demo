@@ -1,7 +1,7 @@
 <%- include('partials/header') %>
 
 <main class="max-w-4xl mx-auto py-8 px-4">
-    <!-- Back to Forum Button -->
+    
     <div class="mb-6">
         <a href="/posts" class="inline-flex items-center text-usda-blue hover:text-usda-darkblue font-medium transition-colors">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -11,12 +11,12 @@
         </a>
     </div>
 
-    <!-- Main Post Content -->
+    
     <div class="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-200">
-        <!-- Post Header -->
+        
         <div class="flex items-start justify-between mb-4">
             <div class="flex items-center space-x-3">
-                <!-- Author Info -->
+                
                 <div class="w-10 h-10 bg-usda-blue rounded-full flex items-center justify-center">
                     <span class="text-white text-sm font-medium">
                         <%= post.author.username.charAt(0).toUpperCase() %>
@@ -29,7 +29,7 @@
                     </div>
                 </div>
             </div>
-            <!-- Category and Delete -->
+            
             <div class="flex items-center space-x-2">
                 <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium 
                     <%= post.category === 'recall-discussion' ? 'bg-red-100 text-red-800' :
@@ -38,7 +38,7 @@
                     <%= post.category.replace('-', ' ') %>
                 </span>
                 
-                <!-- Delete Button (only show for post author) -->
+                
                 <% if (user && post.author._id.toString() === user.id) { %>
                     <form action="/posts/<%= post._id %>/delete" method="POST" class="inline">
                         <button type="submit" 
@@ -51,13 +51,13 @@
             </div>
         </div>
         
-        <!-- Post Title and Content -->
+        
         <h1 class="text-2xl font-bold text-gray-900 mb-4"><%= post.title %></h1>
         <div class="prose max-w-none mb-6">
             <p class="text-gray-700 leading-relaxed whitespace-pre-wrap"><%= post.content %></p>
         </div>
         
-        <!-- Post Image -->
+        
         <% if (post.image && post.image.url) { %>
             <div class="mb-6">
                 <img src="<%= post.image.url %>" 
@@ -69,10 +69,10 @@
             </div>
         <% } %>
         
-        <!-- Post Actions (Likes) -->
+        
         <div class="flex items-center justify-between pt-4 border-t border-gray-200">
             <div class="flex items-center space-x-6">
-                <!-- Like Button -->
+                
                 <form action="/posts/<%= post._id %>/like" method="POST" class="inline">
                     <button type="submit" class="flex items-center space-x-2 text-gray-600 hover:text-usda-blue transition-colors">
                         <span class="text-xl">👍</span>
@@ -81,7 +81,7 @@
                     </button>
                 </form>
                 
-                <!-- Comment Count -->
+                
                 <div class="flex items-center space-x-2 text-gray-600">
                     <span class="text-xl">💬</span>
                     <span class="text-sm font-medium"><%= post.comments.length %></span>
@@ -91,7 +91,7 @@
         </div>
     </div>
 
-    <!-- Add Comment Form -->
+    
     <div class="bg-white rounded-lg shadow-md p-6 mb-6 border border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Add a Comment</h3>
         <form action="/posts/<%= post._id %>/comments" method="POST">
@@ -109,7 +109,7 @@
         </form>
     </div>
 
-    <!-- Comments Section -->
+    
     <div class="bg-white rounded-lg shadow-md p-6 border border-gray-200">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">
             Comments (<%= post.comments.length %>)
@@ -119,12 +119,12 @@
             <div class="space-y-6">
                 <% post.comments.forEach(comment => { %>
                     <div class="border-b border-gray-200 pb-6 last:border-b-0 last:pb-0">
-                        <!-- Comment Header -->
+                        
                         <div class="flex items-start justify-between mb-3">
                             <div class="flex items-center space-x-3">
                                 <div class="w-8 h-8 bg-usda-blue rounded-full flex items-center justify-center">
                                     <span class="text-white text-xs font-medium">
-                                        <!-- This would show comment author initial if we had the data -->
+                                        
                                         💬
                                     </span>
                                 </div>
@@ -136,9 +136,9 @@
                                 </div>
                             </div>
                             
-                            <!-- Comment Actions -->
+                            
                             <div class="flex items-center space-x-4">
-                                <!-- Like Comment Button -->
+                                
                                 <form action="/posts/<%= post._id %>/comments/<%= comment._id %>/like" method="POST" class="inline">
                                     <button type="submit" class="flex items-center space-x-1 text-gray-600 hover:text-usda-blue text-sm transition-colors">
                                         <span>👍</span>
@@ -146,7 +146,7 @@
                                     </button>
                                 </form>
                                 
-                                <!-- Delete Comment Button (only show for comment author) -->
+                                
                                 <% if (user && comment.author.toString() === user.id) { %>
                                     <form action="/posts/<%= post._id %>/comments/<%= comment._id %>/delete" method="POST" class="inline">
                                         <button type="submit" 
@@ -159,13 +159,13 @@
                             </div>
                         </div>
                         
-                        <!-- Comment Content -->
+                        
                         <p class="text-gray-700 leading-relaxed whitespace-pre-wrap"><%= comment.content %></p>
                     </div>
                 <% }); %>
             </div>
         <% } else { %>
-            <!-- No Comments Message -->
+            
             <div class="text-center py-8">
                 <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <span class="text-2xl text-gray-400">💬</span>

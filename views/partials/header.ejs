@@ -4,14 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><%= title %></title>
-    <!-- USDA/FDA Inspired Colors: Blue for trust, Red for alerts, Green for safety -->
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        // USDA/FDA Color Palette
                         usda: {
                             blue: '#005EA2',    // USDA primary blue
                             darkblue: '#1A4480', // USDA dark blue  
@@ -38,42 +37,36 @@
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body class="bg-usda-gray-50 font-sans">
-    <!-- Government-style header -->
+    
     <header class="bg-white border-b-4 border-usda-blue shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
-                <!-- Logo and brand -->
+                
                 <div class="flex items-center">
                     <a href="/" class="flex-shrink-0 flex items-center space-x-3">
-                        <!-- OPTION 1: Simple logo replacement (Recommended) -->
+                        
                         <img src="/imgs/logo.jpg" 
                              alt="FoodGuard Logo" 
                              class="h-10 w-auto object-contain">
                         
-                        <!-- OPTION 2: Logo with background (if your logo has transparency) -->
-                        <!-- 
-                        <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center overflow-hidden">
-                            <img src="/imgs/logo.jpg" 
-                                 alt="FoodGuard Logo" 
-                                 class="h-full w-auto object-contain">
-                        </div>
-                        -->
+                        
+                        
                         
                         <div>
                             <span class="text-xl font-bold text-usda-darkblue">FoodGuard</span>
                             <div class="text-xs text-usda-gray-500 -mt-1">Public Health Protection</div>
                         </div>
                     </a>
-                    <!-- Navigation -->
+                    
                     <nav class="hidden md:ml-8 md:flex md:space-x-6">
-                        <a href="/" class="border-usda-blue text-usda-darkblue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:bg-usda-blue hover:text-white hover:border-usda-darkblue rounded-t">About</a>                        
-                        <a href="/" class="border-usda-blue text-usda-darkblue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:bg-usda-blue hover:text-white hover:border-usda-darkblue rounded-t">Dashboard</a>
-                        <a href="/recalls" class="border-transparent text-usda-gray-700 hover:text-usda-blue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:border-usda-blue">Recalls & Products</a>
-                        <a href="/posts" class="border-transparent text-usda-gray-700 hover:text-usda-blue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:border-usda-blue">Community Forum</a>
+                        <a href="/about" class="border-transparent text-usda-darkblue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:bg-usda-blue hover:text-white hover:border-usda-darkblue">About</a>
+                        <a href="/dashboard" class="border-transparent text-usda-darkblue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:bg-usda-blue hover:text-white hover:border-usda-darkblue">Dashboard</a>
+                        <a href="/recalls" class="border-transparent text-usda-darkblue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:bg-usda-blue hover:text-white hover:border-usda-darkblue">Recalls & Products</a>
+                        <a href="/posts" class="border-transparent text-usda-darkblue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:bg-usda-blue hover:text-white hover:border-usda-darkblue">Community Forum</a>
                     </nav>
                 </div>
                 
-                <!-- User section -->
+                
                 <div class="flex items-center space-x-4">
                     <% if (user) { %>
                         <div class="flex items-center space-x-3 bg-usda-gray-50 px-3 py-2 rounded-lg">

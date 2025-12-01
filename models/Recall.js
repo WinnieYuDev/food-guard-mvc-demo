@@ -54,6 +54,7 @@ const recallSchema = new mongoose.Schema({
       'processed-foods',
       'beverages',
       'snacks',
+      'breakfast',
       'baby-food',
       'other'
     ],
@@ -97,7 +98,6 @@ const recallSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Create text index for search
 recallSchema.index({
   title: 'text',
   description: 'text', 

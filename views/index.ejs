@@ -1,7 +1,7 @@
 <%- include('partials/header') %>
 
 <main class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-    <!-- Government Alert Banner -->
+    
     <div class="bg-gradient-to-r from-usda-blue to-usda-darkblue rounded-xl p-6 mb-8 text-white shadow-lg">
         <div class="flex items-center justify-between">
             <div>
@@ -21,7 +21,7 @@
         </div>
     </div>
 
-    <!-- Active Recalls Section -->
+    
     <section class="mb-12">
         <div class="flex items-center justify-between mb-6">
             <h2 class="text-2xl font-bold text-usda-gray-900 flex items-center">
@@ -41,22 +41,21 @@
                 <% recalls.forEach(recall => { %>
                     <div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all duration-300 border border-usda-gray-200">
                         <div class="relative">
-                            <!-- Use the new categoryImage property -->
+                            
                             <img src="<%= recall.categoryImage || recall.image || '/imgs/placeholder-food.png' %>" 
                                  alt="<%= recall.cleanedTitle || recall.title || 'Food Recall' %>" 
                                  class="w-full h-48 object-cover">
                             
-                            <!-- Image Overlay with Recall Title -->
+                            
                             <div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end">
                                 <div class="p-4 text-white">
                                     <h3 class="font-bold text-lg leading-tight"><%= recall.cleanedTitle || recall.title %></h3>
                                 </div>
                             </div>
                             
-                            <!-- Risk level badge -->
+                            
                             <div class="absolute top-3 right-3">
                                 <% 
-                                // Calculate badge styles safely
                                 const rl = (recall.riskLevel || 'medium').toString().toLowerCase();
                                 let badgeClass = 'bg-usda-green text-white'; // default low
                                 let badgeText = 'Low Risk';
@@ -75,7 +74,7 @@
                             </div>
                         </div>
                         
-                        <!-- Card Body Content -->
+                        
                         <div class="p-4">
                             <p class="text-usda-gray-600 text-sm mb-3 line-clamp-2">
                                 <%= recall.cleanedReason || recall.reason || recall.description || 'No detailed description available.' %>
@@ -86,7 +85,6 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                     </svg>
                                     <% 
-                                    // Safely format the recall date
                                     const recallDate = recall.recallDate || recall.date || recall.report_date;
                                     if (recallDate) {
                                         const formattedDate = new Date(recallDate).toLocaleDateString();
@@ -117,7 +115,7 @@
         <% } %>
     </section>
 
-    <!-- Recent Community Posts -->
+    
     <section>
         <h2 class="text-2xl font-bold text-usda-gray-900 mb-6">Recent Community Discussions</h2>
         
@@ -128,7 +126,6 @@
                         <div class="flex items-center justify-between mb-3">
                             <h3 class="text-lg font-semibold text-usda-gray-900"><%= post.title %></h3>
                             <% 
-                            // Determine badge class and text
                             let badgeClass = 'bg-usda-blue/10 text-usda-blue';
                             let badgeText = 'General';
                             
