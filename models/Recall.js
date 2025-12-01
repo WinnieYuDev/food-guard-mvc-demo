@@ -14,45 +14,79 @@ const recallSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  brand: {
-    type: String,
-    required: true
-  },
   product: {
     type: String,
     required: true
   },
-  category: {
+  brand: {
     type: String,
-    required: true,
-    enum: ['poultry', 'vegetables', 'shellfish', 'meat', 'dairy', 'grains', 'fruits', 'processed-foods', 'beverages', 'other']
-  },
-  retailer: {
-    type: String,
-    required: true,
-    enum: ['trader-joes', 'whole-foods', 'kroger', 'walmart', 'target', 'costco', 'safeway', 'albertsons', 'publix', 'wegmans', 'other']
+    required: true
   },
   reason: {
     type: String,
     required: true
   },
-  riskLevel: {
-    type: String,
-    required: true,
-    enum: ['high', 'medium', 'low']
-  },
   recallDate: {
     type: Date,
     required: true
   },
-  statesAffected: [String],
-  images: [{
-    url: String,
-    caption: String
-  }],
-  source: {
+  agency: {
     type: String,
-    default: 'FDA'
+    enum: ['FDA', 'FSIS', 'USDA'],
+    required: true
+  },
+  riskLevel: {
+    type: String,
+    enum: ['low', 'medium', 'high', 'critical'],
+    required: true
+  },
+  category: {
+    type: String,
+    enum: [
+      'poultry', 
+      'vegetables', 
+      'shellfish', 
+      'meat', 
+      'dairy', 
+      'fruits', 
+      'eggs', 
+      'grains',
+      'processed-foods',
+      'beverages',
+      'snacks',
+      'baby-food'
+    ],
+    required: true
+  },
+  retailer: {
+    type: String,
+    enum: [
+      'trader-joes',
+      'whole-foods', 
+      'kroger', 
+      'walmart', 
+      'costco', 
+      'target', 
+      'safeway', 
+      'albertsons',
+      'various-retailers'
+    ],
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ['Ongoing', 'Completed', 'Pending'],
+    default: 'Ongoing'
+  },
+  distribution: {
+    type: String,
+    required: true
+  },
+  statesAffected: [{
+    type: String
+  }],
+  articleLink: {
+    type: String
   },
   isActive: {
     type: Boolean,
@@ -62,8 +96,13 @@ const recallSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for better search performance
-recallSchema.index({ title: 'text', description: 'text', product: 'text', brand: 'text' });
-recallSchema.index({ category: 1, retailer: 1, riskLevel: 1 });
+// Create text index for search
+recallSchema.index({
+  title: 'text',
+  description: 'text', 
+  product: 'text',
+  brand: 'text',
+  reason: 'text'
+});
 
 module.exports = mongoose.model('Recall', recallSchema);

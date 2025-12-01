@@ -1,236 +1,358 @@
 const Recall = require('../models/Recall');
 const recallApiService = require('../services/recallAPI');
 
+// Show recalls and product lookup page
 exports.getRecalls = async (req, res) => {
   try {
-    const {
-      search,
-      category,
-      retailer,
-      riskLevel,
-      source,
-      page = 1,
-      sortBy = 'recallDate',
-      sortOrder = 'desc',
-      useLiveData = false
-    } = req.query;
-
+    console.log('🔍 Query parameters:', req.query);
+    
+    const page = parseInt(req.query.page) || 1;
+    const limit = 12;
+    const riskLevel = req.query.riskLevel;
+    const search = req.query.search;
+    const category = req.query.category;
+    const retailer = req.query.retailer;
+    
     let recalls = [];
     let total = 0;
 
-    if (useLiveData === 'true') {
-      // Fetch live data from APIs
-      console.log('🔍 Fetching live recall data from APIs...');
-      const apiFilters = { search, limit: 50 };
-      recalls = await recallApiService.fetchAllRecalls(apiFilters);
-      total = recalls.length;
-      
-      // Apply additional filters to API data
-      recalls = recalls.filter(recall => {
-        if (category && category !== 'all' && recall.category !== category) return false;
-        if (retailer && retailer !== 'all' && recall.retailer !== retailer) return false;
-        if (riskLevel && riskLevel !== 'all' && recall.riskLevel !== riskLevel) return false;
-        if (source && source !== 'all' && recall.source !== source) return false;
-        return true;
-      });
-
-    } else {
-      // Use database data (existing functionality)
-      const filter = { isActive: true };
-      
-      if (search) filter.$text = { $search: search };
-      if (category && category !== 'all') filter.category = category;
-      if (retailer && retailer !== 'all') filter.retailer = retailer;
-      if (riskLevel && riskLevel !== 'all') filter.riskLevel = riskLevel;
-      if (source && source !== 'all') filter.source = source;
-
-      const limit = 12;
-      const skip = (parseInt(page) - 1) * limit;
-      
-      const sortOptions = {};
-      sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
-
-      recalls = await Recall.find(filter)
-        .sort(sortOptions)
-        .limit(limit)
-        .skip(skip)
-        .lean();
-
-      total = await Recall.countDocuments(filter);
+    // Build database query
+    const dbQuery = { isActive: true };
+    
+    if (riskLevel && riskLevel !== 'all') dbQuery.riskLevel = riskLevel;
+    if (category && category !== 'all') dbQuery.category = category;
+    if (retailer && retailer !== 'all') dbQuery.retailer = retailer;
+    
+    if (search && search.trim() !== '') {
+      dbQuery.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { product: { $regex: search, $options: 'i' } },
+        { brand: { $regex: search, $options: 'i' } },
+        { reason: { $regex: search, $options: 'i' } }
+      ];
     }
 
-    const totalPages = Math.ceil(total / 12);
+    console.log('📋 Database query:', dbQuery);
 
-    // Get filter counts
-    const categoryCounts = await Recall.aggregate([
-      { $match: { isActive: true } },
-      { $group: { _id: '$category', count: { $sum: 1 } } }
-    ]);
+    // Try database first
+    try {
+      recalls = await Recall.find(dbQuery)
+        .sort({ recallDate: -1 })
+        .limit(limit)
+        .skip((page - 1) * limit)
+        .lean();
 
-    const retailerCounts = await Recall.aggregate([
-      { $match: { isActive: true } },
-      { $group: { _id: '$retailer', count: { $sum: 1 } } }
-    ]);
+      total = await Recall.countDocuments(dbQuery);
+      console.log(`📊 Database results: ${recalls.length} recalls out of ${total} total`);
+    } catch (dbError) {
+      console.error('❌ Database error:', dbError.message);
+    }
 
-    const sourceCounts = await Recall.aggregate([
-      { $match: { isActive: true } },
-      { $group: { _id: '$source', count: { $sum: 1 } } }
-    ]);
+    // If no results in database, use live API data
+    if (recalls.length === 0) {
+      console.log('🔄 No database results, fetching from live APIs...');
+      
+      try {
+        const apiFilters = { 
+          search: search || '', 
+          limit: 50 
+        };
+        
+        // Add overall timeout for API calls
+        const apiPromise = recallApiService.fetchAllRecalls(apiFilters);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('API timeout')), 15000)
+        );
+        
+        let apiRecalls = await Promise.race([apiPromise, timeoutPromise]);
+        
+        console.log(`🌐 API returned ${apiRecalls ? apiRecalls.length : 0} recalls`);
+        
+        if (apiRecalls && apiRecalls.length > 0) {
+          // Apply filters to API data
+          if (category && category !== 'all') {
+            apiRecalls = apiRecalls.filter(recall => recall.category === category);
+          }
+          if (retailer && retailer !== 'all') {
+            apiRecalls = apiRecalls.filter(recall => recall.retailer === retailer);
+          }
+          if (riskLevel && riskLevel !== 'all') {
+            apiRecalls = apiRecalls.filter(recall => recall.riskLevel === riskLevel);
+          }
 
-    res.render('recalls/index', {
-      title: 'Food Recalls - FoodGuard',
+          recalls = apiRecalls.slice(0, limit);
+          total = apiRecalls.length;
+          
+          console.log(`📊 Filtered API results: ${recalls.length} recalls`);
+        }
+      } catch (apiError) {
+        console.error('❌ API fetch error:', apiError.message);
+        // Continue with empty recalls rather than hanging
+      }
+    }
+
+    // Ensure all recalls have required fields with proper fallbacks
+    recalls = recalls.map(recall => {
+      // Ensure recallDate is a valid Date object
+      let recallDate;
+      try {
+        recallDate = new Date(recall.recallDate);
+        if (isNaN(recallDate.getTime())) {
+          recallDate = new Date(); // Fallback to current date
+        }
+      } catch (error) {
+        recallDate = new Date(); // Fallback to current date
+      }
+
+      // Generate article link if not provided
+      let articleLink = recall.articleLink;
+      if (!articleLink || articleLink === '#') {
+        const agency = recall.agency || 'FDA';
+        const brandSlug = (recall.brand || 'unknown').toLowerCase().replace(/\s+/g, '-');
+        const productSlug = (recall.product || 'product').toLowerCase().replace(/\s+/g, '-');
+        
+        if (agency === 'FSIS') {
+          articleLink = `https://www.fsis.usda.gov/recalls-alerts/${brandSlug}-recalls-${productSlug}-due-${(recall.reason || 'safety-concerns').toLowerCase().replace(/\s+/g, '-')}`;
+        } else {
+          articleLink = `https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts/${brandSlug}-recalls-${productSlug}-due-${(recall.reason || 'safety-concerns').toLowerCase().replace(/\s+/g, '-')}`;
+        }
+      }
+
+      return {
+        // Core identification
+        recallId: recall.recallId || `RECALL-${Date.now()}`,
+        
+        // Product information
+        title: recall.title || 'Product Recall',
+        description: recall.description || 'No description available',
+        product: recall.product || 'Unknown Product',
+        brand: recall.brand || 'Unknown Brand',
+        reason: recall.reason || 'Not specified',
+        
+        // Categorization
+        category: recall.category || 'processed-foods',
+        riskLevel: recall.riskLevel || 'medium',
+        retailer: recall.retailer || 'various-retailers',
+        
+        // Agency and status
+        agency: recall.agency || 'FDA',
+        status: recall.status || 'Ongoing',
+        
+        // Distribution
+        distribution: recall.distribution || 'Nationwide',
+        statesAffected: Array.isArray(recall.statesAffected) ? recall.statesAffected : ['Nationwide'],
+        
+        // Dates
+        recallDate: recallDate,
+        
+        // External link
+        articleLink: articleLink,
+        
+        // System fields
+        isActive: recall.isActive !== undefined ? recall.isActive : true,
+        
+        // Preserve all original fields
+        ...recall
+      };
+    });
+
+    const totalPages = Math.ceil(total / limit);
+
+    // Define options arrays
+    const categoryOptions = [
+      { value: 'poultry', label: '🐔 Poultry' },
+      { value: 'vegetables', label: '🥦 Vegetables' },
+      { value: 'shellfish', label: '🦐 Shellfish' },
+      { value: 'meat', label: '🥩 Meat' },
+      { value: 'dairy', label: '🥛 Dairy' },
+      { value: 'fruits', label: '🍎 Fruits' },
+      { value: 'eggs', label: '🥚 Eggs' },
+      { value: 'grains', label: '🌾 Grains' }
+    ];
+
+    const retailerOptions = [
+      { value: 'trader-joes', label: '🛒 Trader Joe\'s' },
+      { value: 'whole-foods', label: '🛒 Whole Foods' },
+      { value: 'kroger', label: '🛒 Kroger' },
+      { value: 'walmart', label: '🛒 Walmart' },
+      { value: 'costco', label: '🛒 Costco' },
+      { value: 'target', label: '🛒 Target' },
+      { value: 'safeway', label: '🛒 Safeway' },
+      { value: 'albertsons', label: '🛒 Albertsons' }
+    ];
+
+    res.render('recalls', {
+      title: 'Recalls & Product Lookup - FoodGuard',
       recalls,
       user: req.user,
-      filters: {
-        search: search || '',
-        category: category || 'all',
-        retailer: retailer || 'all',
-        riskLevel: riskLevel || 'all',
-        source: source || 'all',
-        sortBy,
-        sortOrder,
-        useLiveData: useLiveData === 'true'
-      },
       pagination: {
-        page: parseInt(page),
+        page,
         totalPages,
         hasNext: page < totalPages,
         hasPrev: page > 1
       },
-      counts: {
-        categories: categoryCounts,
-        retailers: retailerCounts,
-        sources: sourceCounts
+      filters: {
+        riskLevel: riskLevel || 'all',
+        search: search || '',
+        category: category || 'all',
+        retailer: retailer || 'all'
       },
-      categoryOptions: [
-        { value: 'poultry', label: 'Poultry' },
-        { value: 'vegetables', label: 'Vegetables' },
-        { value: 'shellfish', label: 'Shellfish' },
-        { value: 'meat', label: 'Meat' },
-        { value: 'dairy', label: 'Dairy' },
-        { value: 'fruits', label: 'Fruits' },
-        { value: 'eggs', label: 'Eggs' }
-      ],
-      retailerOptions: [
-        { value: 'trader-joes', label: 'Trader Joe\'s' },
-        { value: 'whole-foods', label: 'Whole Foods' },
-        { value: 'kroger', label: 'Kroger' },
-        { value: 'walmart', label: 'Walmart' },
-        { value: 'costco', label: 'Costco' }
-      ],
-      sourceOptions: [
-        { value: 'FDA', label: 'FDA' },
-        { value: 'USDA-FSIS', label: 'USDA FSIS' }
-      ]
+      categoryOptions,
+      retailerOptions
     });
   } catch (error) {
-    console.error('Error fetching recalls:', error);
-    res.status(500).render('error', {
-      title: 'Server Error',
-      message: 'Failed to load food recalls'
+    console.error('❌ Recalls controller error:', error);
+    
+    // Even on error, provide basic structure for the template
+    const categoryOptions = [
+      { value: 'poultry', label: '🐔 Poultry' },
+      { value: 'vegetables', label: '🥦 Vegetables' }
+    ];
+
+    const retailerOptions = [
+      { value: 'walmart', label: '🛒 Walmart' },
+      { value: 'target', label: '🛒 Target' }
+    ];
+
+    res.render('recalls', {
+      title: 'Recalls & Product Lookup - FoodGuard',
+      recalls: [],
+      user: req.user,
+      pagination: { page: 1, totalPages: 1, hasNext: false, hasPrev: false },
+      filters: {
+        riskLevel: 'all',
+        search: '',
+        category: 'all',
+        retailer: 'all'
+      },
+      categoryOptions,
+      retailerOptions
     });
   }
 };
 
-// New method to sync API data to database
-exports.syncRecalls = async (req, res) => {
+// Handle product lookup
+exports.lookupProduct = async (req, res) => {
   try {
-    console.log('🔄 Syncing recall data from APIs...');
+    const { barcode, productName } = req.body;
     
-    const apiRecalls = await recallApiService.fetchAllRecalls();
-    
-    let syncedCount = 0;
-    let newCount = 0;
+    console.log('🔍 Product lookup request:', { barcode, productName });
 
-    for (const apiRecall of apiRecalls) {
-      // Check if recall already exists
-      const existingRecall = await Recall.findOne({ 
-        recallId: apiRecall.recallId 
+    if (!barcode && !productName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide either a barcode or product name'
       });
+    }
 
-      if (existingRecall) {
-        // Update existing recall
-        await Recall.findByIdAndUpdate(existingRecall._id, apiRecall);
-        syncedCount++;
-      } else {
-        // Create new recall
-        await Recall.create(apiRecall);
-        newCount++;
+    const searchTerm = productName || barcode || '';
+    let relatedRecalls = [];
+
+    if (searchTerm) {
+      relatedRecalls = await Recall.find({
+        $or: [
+          { product: { $regex: searchTerm, $options: 'i' } },
+          { brand: { $regex: searchTerm, $options: 'i' } },
+          { title: { $regex: searchTerm, $options: 'i' } },
+          { description: { $regex: searchTerm, $options: 'i' } }
+        ],
+        isActive: true
+      })
+      .sort({ recallDate: -1 })
+      .limit(10)
+      .lean();
+    }
+
+    // Ensure recalls have proper article links
+    relatedRecalls = relatedRecalls.map(recall => {
+      let articleLink = recall.articleLink;
+      if (!articleLink || articleLink === '#') {
+        const agency = recall.agency || 'FDA';
+        const brandSlug = (recall.brand || 'unknown').toLowerCase().replace(/\s+/g, '-');
+        const productSlug = (recall.product || 'product').toLowerCase().replace(/\s+/g, '-');
+        
+        if (agency === 'FSIS') {
+          articleLink = `https://www.fsis.usda.gov/recalls-alerts/${brandSlug}-recalls-${productSlug}-due-${(recall.reason || 'safety-concerns').toLowerCase().replace(/\s+/g, '-')}`;
+        } else {
+          articleLink = `https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts/${brandSlug}-recalls-${productSlug}-due-${(recall.reason || 'safety-concerns').toLowerCase().replace(/\s+/g, '-')}`;
+        }
       }
-    }
 
-    req.flash('success', `Sync completed: ${newCount} new recalls, ${syncedCount} updated`);
-    res.redirect('/recalls');
-    
-  } catch (error) {
-    console.error('Sync error:', error);
-    req.flash('error', 'Failed to sync recall data');
-    res.redirect('/recalls');
-  }
-};
+      return {
+        ...recall,
+        articleLink: articleLink
+      };
+    });
 
-// API endpoint for external consumers
-exports.apiGetRecalls = async (req, res) => {
-  try {
-    const { 
-      search, 
-      category, 
-      retailer, 
-      riskLevel, 
-      source,
-      limit = 50,
-      useLiveData = false 
-    } = req.query;
-
-    let recalls;
-
-    if (useLiveData === 'true') {
-      recalls = await recallApiService.fetchAllRecalls({ 
-        search, 
-        limit: parseInt(limit) 
-      });
-    } else {
-      const filter = { isActive: true };
-      
-      if (search) filter.$text = { $search: search };
-      if (category && category !== 'all') filter.category = category;
-      if (retailer && retailer !== 'all') filter.retailer = retailer;
-      if (riskLevel && riskLevel !== 'all') filter.riskLevel = riskLevel;
-      if (source && source !== 'all') filter.source = source;
-
-      recalls = await Recall.find(filter)
-        .sort({ recallDate: -1 })
-        .limit(parseInt(limit))
-        .lean();
-    }
+    const safetyInfo = relatedRecalls.length > 0 ? {
+      status: 'RECALL_ACTIVE',
+      message: '⚠️ This product has active recalls. Do not consume.',
+      riskLevel: relatedRecalls[0].riskLevel,
+      totalRecalls: relatedRecalls.length,
+      severity: 'high'
+    } : {
+      status: 'NO_RECALLS_FOUND',
+      message: '✅ No active recalls found for this product.',
+      riskLevel: 'low',
+      totalRecalls: 0,
+      severity: 'none'
+    };
 
     res.json({
       success: true,
-      data: recalls,
-      total: recalls.length,
-      timestamp: new Date().toISOString()
+      product: {
+        name: productName || 'Product Lookup',
+        barcode: barcode || 'N/A',
+        searchTerm: searchTerm
+      },
+      relatedRecalls,
+      safetyInfo,
+      search: {
+        barcode,
+        productName,
+        timestamp: new Date().toISOString(),
+        resultsCount: relatedRecalls.length
+      }
     });
+
   } catch (error) {
-    console.error('API recall error:', error);
-    res.status(500).json({
+    console.error('❌ Product lookup error:', error);
+    res.status(500).json({ 
       success: false,
-      error: 'Failed to fetch recalls',
-      message: error.message
+      error: 'Failed to lookup product information'
     });
   }
 };
 
-// Get single recall detail
+// Get single recall details
 exports.getRecall = async (req, res) => {
   try {
     const recall = await Recall.findById(req.params.id).lean();
     
     if (!recall) {
-      req.flash('error', 'Recall not found');
       return res.redirect('/recalls');
     }
 
-    // Get related recalls
+    // Ensure article link exists
+    let articleLink = recall.articleLink;
+    if (!articleLink || articleLink === '#') {
+      const agency = recall.agency || 'FDA';
+      const brandSlug = (recall.brand || 'unknown').toLowerCase().replace(/\s+/g, '-');
+      const productSlug = (recall.product || 'product').toLowerCase().replace(/\s+/g, '-');
+      
+      if (agency === 'FSIS') {
+        articleLink = `https://www.fsis.usda.gov/recalls-alerts/${brandSlug}-recalls-${productSlug}-due-${(recall.reason || 'safety-concerns').toLowerCase().replace(/\s+/g, '-')}`;
+      } else {
+        articleLink = `https://www.fda.gov/safety/recalls-market-withdrawals-safety-alerts/${brandSlug}-recalls-${productSlug}-due-${(recall.reason || 'safety-concerns').toLowerCase().replace(/\s+/g, '-')}`;
+      }
+    }
+
+    const recallWithLink = {
+      ...recall,
+      articleLink: articleLink
+    };
+
     const relatedRecalls = await Recall.find({
       _id: { $ne: recall._id },
       $or: [
@@ -243,15 +365,58 @@ exports.getRecall = async (req, res) => {
     .limit(4)
     .lean();
 
-    res.render('recalls/show', {
+    res.render('post', {
       title: `${recall.title} - FoodGuard`,
-      recall,
+      recall: recallWithLink,
       relatedRecalls,
       user: req.user
     });
   } catch (error) {
     console.error('Error fetching recall:', error);
-    req.flash('error', 'Failed to load recall details');
     res.redirect('/recalls');
+  }
+};
+
+// API endpoint for external consumers
+exports.apiGetRecalls = async (req, res) => {
+  try {
+    const { 
+      search, 
+      category, 
+      retailer, 
+      riskLevel,
+      limit = 50
+    } = req.query;
+
+    const filter = { isActive: true };
+    
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { product: { $regex: search, $options: 'i' } },
+        { brand: { $regex: search, $options: 'i' } }
+      ];
+    }
+    if (category && category !== 'all') filter.category = category;
+    if (retailer && retailer !== 'all') filter.retailer = retailer;
+    if (riskLevel && riskLevel !== 'all') filter.riskLevel = riskLevel;
+
+    const recalls = await Recall.find(filter)
+      .sort({ recallDate: -1 })
+      .limit(parseInt(limit))
+      .lean();
+
+    res.json({
+      success: true,
+      data: recalls,
+      total: recalls.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('API recall error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch recalls'
+    });
   }
 };

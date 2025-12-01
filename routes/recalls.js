@@ -1,30 +1,59 @@
 const express = require('express');
 const router = express.Router();
 const recallsController = require('../controllers/recalls');
-const { isLoggedIn } = require('../middleware/auth');
+const { seedDatabase } = require('../utils/seedRecalls'); // Make sure this path is correct
 
-// Main recalls page with filters
-router.get('/', isLoggedIn, recallsController.getRecalls);
+// Main recalls page
+router.get('/', recallsController.getRecalls);
 
 // Single recall detail page
-router.get('/:id', isLoggedIn, recallsController.getRecall);
+router.get('/:id', recallsController.getRecall);
 
-// Sync recalls from APIs
-router.post('/sync', isLoggedIn, recallsController.syncRecalls);
+// Product lookup API endpoint
+router.post('/lookup', recallsController.lookupProduct);
 
-// API endpoints
-router.get('/api/search', recallsController.apiGetRecalls);
+// External API endpoint
+router.get('/api/recalls', recallsController.apiGetRecalls);
 
-module.exports = router;
-
-//test api endpoint
-router.get('/api/test', async (req, res) => {
+// Add this route for seeding (remove in production)
+router.get('/seed/recalls', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Not allowed in production' });
+  }
+  
   try {
-    const apiStatus = await recallApiService.testAPIs();
+    const count = await seedDatabase();
+    res.json({ 
+      success: true, 
+      message: `Successfully seeded ${count} recalls`,
+      recalls: count
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Debug route to check retailers in database
+router.get('/debug/retailers', async (req, res) => {
+  try {
+    const Recall = require('../models/Recall');
+    const retailers = await Recall.aggregate([
+      { $match: { isActive: true } },
+      { $group: { 
+        _id: '$retailer', 
+        count: { $sum: 1 },
+        examples: { $push: { title: '$title', id: '$_id' } }
+      }},
+      { $sort: { _id: 1 } }
+    ]);
+    
     res.json({
       success: true,
-      apis: apiStatus,
-      timestamp: new Date().toISOString()
+      retailers: retailers,
+      totalRecalls: retailers.reduce((sum, r) => sum + r.count, 0)
     });
   } catch (error) {
     res.status(500).json({
@@ -33,3 +62,5 @@ router.get('/api/test', async (req, res) => {
     });
   }
 });
+
+module.exports = router;
