@@ -597,7 +597,7 @@ exports.lookupProduct = async (req, res) => {
       .lean();
 
       if (relatedRecalls.length === 0) {
-        console.log('🔄 No database results, searching APIs...');
+        console.log('No database results, searching APIs...');
         try {
           const apiRecalls = await recallApiService.searchRecalls(searchTerm, 10);
           relatedRecalls = apiRecalls.map(recall => this.normalizeRecallData(recall));
@@ -609,8 +609,8 @@ exports.lookupProduct = async (req, res) => {
               console.error('Failed to save search results to DB:', saveError.message);
             }
           }
-        } catch (apiError) {
-          console.error('❌ API search error:', apiError.message);
+          } catch (apiError) {
+          console.error('API search error:', apiError.message);
         }
       }
     }
@@ -698,7 +698,7 @@ exports.lookupProduct = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Product lookup error:', error);
+    console.error('Product lookup error:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to lookup product information',
@@ -739,7 +739,7 @@ exports.getRecall = async (req, res) => {
       user: req.user
     });
   } catch (error) {
-    console.error('❌ Error fetching recall details:', error);
+    console.error('Error fetching recall details:', error);
     res.redirect('/recalls');
   }
 };
@@ -791,7 +791,7 @@ exports.apiGetRecalls = async (req, res) => {
         const apiRecalls = await recallApiService.fetchAllRecalls(apiFilters);
         recalls = apiRecalls.map(recall => this.normalizeRecallData(recall));
       } catch (apiError) {
-        console.error('❌ API fetch in API endpoint:', apiError.message);
+        console.error('API fetch in API endpoint:', apiError.message);
       }
     }
 
@@ -808,7 +808,7 @@ exports.apiGetRecalls = async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('❌ API recall error:', error);
+    console.error('API recall error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch recalls',
@@ -819,7 +819,7 @@ exports.apiGetRecalls = async (req, res) => {
 
 exports.syncRecalls = async (req, res) => {
   try {
-    console.log('🔄 Manual recall sync requested');
+    console.log('Manual recall sync requested');
     
     const apiRecalls = await recallApiService.fetchAllRecalls({
       limit: 100,
@@ -836,7 +836,7 @@ exports.syncRecalls = async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('❌ Recall sync error:', error);
+    console.error('Recall sync error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to sync recalls',
@@ -1088,20 +1088,20 @@ exports.saveApiResultsToDB = async (apiRecalls) => {
         );
       }
     } catch (error) {
-      console.error('❌ Error saving recall to DB:', error.message);
+      console.error('Error saving recall to DB:', error.message);
     }
   }
   
-  console.log(`💾 Saved ${savedCount} new recalls to database`);
+  console.log(`Saved ${savedCount} new recalls to database`);
   return savedCount;
 };
 
 exports.reNormalizeAllRecalls = async () => {
   try {
-    console.log('🔄 Starting re-normalization of all recalls in database...');
+    console.log('Starting re-normalization of all recalls in database...');
     
     const allRecalls = await Recall.find({}).lean();
-    console.log(`📊 Found ${allRecalls.length} recalls to process`);
+    console.log(`Found ${allRecalls.length} recalls to process`);
     
     let updatedCount = 0;
     
@@ -1122,15 +1122,15 @@ exports.reNormalizeAllRecalls = async () => {
         );
         
         updatedCount++;
-      } catch (err) {
-        console.error(`❌ Failed to update recall ${recall._id}:`, err.message);
+        } catch (err) {
+        console.error(`Failed to update recall ${recall._id}:`, err.message);
       }
     }
     
-    console.log(`✅ Re-normalized ${updatedCount} recalls`);
+    console.log(`Re-normalized ${updatedCount} recalls`);
     return updatedCount;
   } catch (error) {
-    console.error('❌ Re-normalization error:', error);
+    console.error('Re-normalization error:', error);
     return 0;
   }
 };
@@ -1144,7 +1144,7 @@ exports.getNews = async (req, res) => {
 
     return res.json({ success: true, results: normalized });
   } catch (error) {
-    console.error('❌ Error fetching news (server proxy):', error.message);
+    console.error('Error fetching news (server proxy):', error.message);
     return res.status(500).json({ success: false, error: 'Failed to fetch recall news' });
   }
 };

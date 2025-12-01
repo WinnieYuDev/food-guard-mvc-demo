@@ -230,7 +230,7 @@ const seedDatabase = async () => {
     
     return seedRecalls.length;
   } catch (error) {
-    console.error('❌ Error seeding database:', error);
+    console.error('Error seeding database:', error);
     throw error;
   }
 };

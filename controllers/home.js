@@ -90,12 +90,12 @@ const selectImageFromText = (text, fallbackCategory) => {
     
     for (const key of sortedKeys) {
         if (normalized.includes(key)) {
-            console.log(`🖼️  Matched keyword "${key}" in text: "${text.substring(0, 50)}..."`);
+            console.log(`Matched keyword "${key}" in text: "${text.substring(0, 50)}..."`);
             return keywordImageMap[key];
         }
     }
-    
-    console.log(`🖼️  Using category fallback for: "${fallbackCategory}"`);
+
+    console.log(`Using category fallback for: "${fallbackCategory}"`);
     return getCategoryImage(fallbackCategory);
 };
 
@@ -166,7 +166,7 @@ const sanitizeReason = (reason, title) => {
 
 exports.getHome = async (req, res) => {
     try {
-        console.log('🏠 Home controller called!');
+        console.log('Home controller called');
 
         let activeRecalls = [];
         let recentPosts = [];
@@ -181,7 +181,7 @@ exports.getHome = async (req, res) => {
                     .limit(6)
                     .lean();
 
-                console.log(`📊 Found ${activeRecalls.length} active recalls`);
+                console.log(`Found ${activeRecalls.length} active recalls`);
 
                 activeRecalls = activeRecalls.map(recall => {
                     const normalizedRecall = recallsController.normalizeRecallData(recall);
@@ -218,7 +218,7 @@ exports.getHome = async (req, res) => {
                     .limit(3)
                     .lean();
 
-                console.log(`✅ Homepage data loaded: ${recentPosts.length} posts, ${activeRecalls.length} recalls`);
+                console.log(`Homepage data loaded: ${recentPosts.length} posts, ${activeRecalls.length} recalls`);
             } catch (dbError) {
                 console.log('Database query failed:', dbError.message);
             }
@@ -226,7 +226,7 @@ exports.getHome = async (req, res) => {
             console.log('MongoDB not connected, using empty data');
         }
 
-        console.log('📤 Rendering index.ejs');
+        console.log('Rendering index.ejs');
         res.render('index', {
             title: 'FoodGuard - Home',
             recalls: activeRecalls, // This now contains the 'categoryImage' property
@@ -235,7 +235,7 @@ exports.getHome = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ Home controller error:', error);
+        console.error('Home controller error:', error);
         res.render('index', {
             title: 'FoodGuard - Home',
             recalls: [],

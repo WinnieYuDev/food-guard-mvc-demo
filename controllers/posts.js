@@ -69,9 +69,9 @@ module.exports = {
 
   createPost: async (req, res) => {
     try {
-      console.log('📝 Creating post...');
-      console.log('📁 File:', req.file ? 'Exists' : 'None');
-      console.log('☁️ Cloudinary result:', req.cloudinaryResult ? 'Exists' : 'None');
+      console.log('Creating post...');
+      console.log('File:', req.file ? 'Exists' : 'None');
+      console.log('Cloudinary result:', req.cloudinaryResult ? 'Exists' : 'None');
 
       let imageData = null;
       
@@ -81,7 +81,7 @@ module.exports = {
           cloudinaryId: req.cloudinaryResult.cloudinaryId,
           caption: req.body.imageCaption || ''
         };
-        console.log('✅ Using image from Cloudinary middleware:', imageData.url);
+        console.log('Using image from Cloudinary middleware:', imageData.url);
       }
 
       await Post.create({
@@ -93,13 +93,13 @@ module.exports = {
         author: req.user.id,
       });
 
-      console.log('✅ Post created successfully!');
-      console.log('🖼️ Image attached:', !!imageData);
+      console.log('Post created successfully!');
+      console.log('Image attached:', !!imageData);
       
       req.flash('success', 'Post created successfully!' + (imageData ? ' (with image)' : ''));
       res.redirect('/posts');
     } catch (err) {
-      console.error('❌ Error creating post:', err);
+      console.error('Error creating post:', err);
       req.flash('error', 'Failed to create post: ' + err.message);
       res.redirect('/posts/new');
     }
