@@ -7,58 +7,84 @@ class RecallApiService {
   }
 
   async fetchFDARecalls(options = {}) {
+    const { limit = 50, search = '', monthsBack = 5 } = options;
     try {
-      const { limit = 50, search = '', monthsBack = 5 } = options;
-      
-      // Build FDA API query with date range
-      const queryParams = new URLSearchParams({
-        limit: Math.min(limit, 100), // FDA allows up to 1000 but we'll be conservative
-        sort: 'report_date:desc'
-      });
 
-      // Add date range for recent recalls
+      // Build FDA openFDA search query
+      const queryParts = [];
+
       if (monthsBack) {
         const startDate = new Date();
         startDate.setMonth(startDate.getMonth() - monthsBack);
         const endDate = new Date();
-        
-        const formatDate = (date) => {
-          return date.toISOString().split('T')[0].replace(/-/g, '');
-        };
-        
-        queryParams.append('search', `report_date:[${formatDate(startDate)}+TO+${formatDate(endDate)}]`);
+
+        const formatDate = (date) => date.toISOString().split('T')[0].replace(/-/g, '');
+        queryParts.push(`report_date:[${formatDate(startDate)}+TO+${formatDate(endDate)}]`);
       }
 
-      // Add search term if provided
-      if (search) {
-        const existingSearch = queryParams.get('search') || '';
-        const newSearch = `product_description:"${search.replace(/"/g, '')}"`;
-        queryParams.set('search', existingSearch ? `(${existingSearch})+AND+(${newSearch})` : newSearch);
+      if (search && String(search).trim() !== '') {
+        const s = String(search).replace(/"/g, '').trim();
+        // Search several common fields
+        const sub = [`product_description:"${s}"`, `recalling_firm:"${s}"`, `reason_for_recall:"${s}"`].join('+OR+');
+        queryParts.push(`(${sub})`);
       }
 
-      const url = `${this.fdaBaseUrl}?${queryParams.toString()}`;
+      const searchQuery = queryParts.join('+AND+');
+      const url = `${this.fdaBaseUrl}?limit=${Math.min(limit, 100)}&sort=report_date:desc${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`;
       console.log('🌐 FDA API call:', url);
-      
+
       const response = await axios.get(url, {
         timeout: 10000,
-        headers: {
-          'User-Agent': 'FoodSafetyApp/1.0'
-        }
+        headers: { 'User-Agent': 'FoodSafetyApp/1.0' }
       });
-      
+
       const results = response.data.results || [];
-      console.log(`✅ FDA API returned ${results.length} recalls`);
-      
+      console.log(`FDA API returned ${results.length} recalls`);
+
       return this.transformFDAData(results);
     } catch (error) {
-      console.error('❌ FDA API Error:', error.response?.status, error.message);
+      console.error('❌ FDA API Error (primary query):', error.response?.status, error.message);
+      // Retry with a simpler query (no date range or search) which often succeeds
+      try {
+        const fallbackUrl = `${this.fdaBaseUrl}?limit=${Math.min(limit, 100)}&sort=report_date:desc`;
+        console.log('🌐 FDA fallback API call (simple):', fallbackUrl);
+        const fallbackResp = await axios.get(fallbackUrl, { timeout: 10000, headers: { 'User-Agent': 'FoodSafetyApp/1.0' } });
+        const fbResults = fallbackResp.data.results || [];
+        console.log(`FDA API fallback returned ${fbResults.length} recalls`);
+        return this.transformFDAData(fbResults);
+      } catch (fbError) {
+        console.error('❌ FDA API fallback error:', fbError.response?.status, fbError.message || fbError);
+      }
+
+      return [];
+    }
+  }
+
+  // Search both FDA and FSIS for a given search term (used by product lookup)
+  async searchRecalls(searchTerm, limit = 20) {
+    try {
+      const filters = { search: searchTerm, limit, monthsBack: 12 };
+      const [fdaRes, fsisRes] = await Promise.allSettled([
+        this.fetchFDARecalls(filters),
+        this.fetchFSISRecalls(filters)
+      ]);
+
+      let results = [];
+      if (fdaRes.status === 'fulfilled') results.push(...fdaRes.value);
+      if (fsisRes.status === 'fulfilled') results.push(...fsisRes.value);
+
+      // Sort by date and limit
+      results = results.sort((a, b) => new Date(b.recallDate) - new Date(a.recallDate)).slice(0, limit);
+      return results;
+    } catch (error) {
+      console.error('❌ searchRecalls error:', error.message);
       return [];
     }
   }
 
   async fetchFSISRecalls(options = {}) {
     try {
-      const { limit = 50, monthsBack = 5 } = options;
+      const { limit = 50, monthsBack = 5, search = '' } = options;
       
       console.log('🌐 FSIS API call:', this.fsisBaseUrl);
       
@@ -84,9 +110,20 @@ class RecallApiService {
       }
       
       // Apply limit
+      // If a search term is provided, apply a simple text filter against a few fields
+      if (search && String(search).trim() !== '') {
+        const s = String(search).toLowerCase();
+        results = results.filter(r => {
+          const product = String(r.Product || r.product_name || r.field_title || '').toLowerCase();
+          const company = String(r.Firm || r.establishment || r.field_establishment || '').toLowerCase();
+          const reason = String(r.Reason || r.reason || r.field_recall_reason || r.field_summary || '').toLowerCase();
+          return product.includes(s) || company.includes(s) || reason.includes(s);
+        });
+      }
+
       results = results.slice(0, limit);
       
-      console.log(`✅ FSIS API returned ${results.length} recalls`);
+      console.log(`FSIS API returned ${results.length} recalls`);
       
       return this.transformFSISData(results);
     } catch (error) {
@@ -109,7 +146,7 @@ class RecallApiService {
       // Process FDA results
       if (fdaRecalls.status === 'fulfilled') {
         recalls.push(...fdaRecalls.value);
-        console.log(`✅ FDA: ${fdaRecalls.value.length} recalls`);
+        console.log(`FDA: ${fdaRecalls.value.length} recalls`);
       } else {
         console.log('❌ FDA API failed');
       }
@@ -117,7 +154,7 @@ class RecallApiService {
       // Process FSIS results
       if (fsisRecalls.status === 'fulfilled') {
         recalls.push(...fsisRecalls.value);
-        console.log(`✅ FSIS: ${fsisRecalls.value.length} recalls`);
+        console.log(`FSIS: ${fsisRecalls.value.length} recalls`);
       } else {
         console.log('❌ FSIS API failed');
       }
@@ -126,7 +163,7 @@ class RecallApiService {
       
       // If both APIs failed, use mock data
       if (recalls.length === 0) {
-        console.log('⚠️ Both APIs failed, using mock data');
+        console.log('Both APIs failed, using mock data');
         return this.getMockRecalls(filters);
       }
       
@@ -191,31 +228,43 @@ class RecallApiService {
 
   transformFSISData(fsisData) {
     if (!Array.isArray(fsisData)) return [];
-    
     return fsisData.map(recall => {
-      // Handle various FSIS field names (camelCase and PascalCase)
-      const productName = recall.Product || recall.product_name || 'Unknown FSIS Product';
-      const reason = recall.Reason || recall.reason || 'Not specified';
-      const recallDate = recall.ReleaseDate || recall.Date || recall.recall_date || new Date().toISOString();
-      const company = recall.Firm || recall.establishment || recall.company || 'Unknown Company';
-      const recallNumber = recall.RecallNumber || recall.recall_number || `FSIS-${Date.now()}`;
-      
+      // FSIS API sometimes returns fields with `field_` prefixes or PascalCase
+      const productName = recall.Product || recall.product_name || recall.field_title || recall.field_product_items || recall.field_summary || 'Unknown FSIS Product';
+      // Try multiple reason fields
+      const reason = recall.Reason || recall.reason || recall.field_recall_reason || recall.field_summary || 'Not specified';
+      // Dates
+      const recallDateRaw = recall.ReleaseDate || recall.Date || recall.field_recall_date || recall.field_last_modified_date || recall.recall_date || new Date().toISOString();
+      const company = recall.Firm || recall.establishment || recall.field_establishment || recall.company || 'Unknown Company';
+      const recallNumber = recall.RecallNumber || recall.recall_number || recall.field_recall_number || `FSIS-${Date.now()}`;
+
+      // Prefer extracting a concise product title from product items or field_title
+      let conciseProduct = productName;
+      if (typeof conciseProduct === 'string' && conciseProduct.length > 250) {
+        // If it's long HTML summary, try extracting first sentence
+        const plain = conciseProduct.replace(/<[^>]*>/g, '').trim();
+        conciseProduct = plain.split(/[\.\n]/)[0];
+      }
+
+      // Distribution: try FSIS-specific fields
+      const distribution = recall.Distribution || recall.distribution || recall.field_distro_list || recall.field_states || 'Nationwide';
+
       return {
         recallId: recallNumber,
-        title: productName,
-        description: reason,
-        product: productName,
+        title: conciseProduct,
+        description: reason || (recall.field_summary || '').replace(/<[^>]*>/g, '').trim() || 'Not specified',
+        product: conciseProduct,
         brand: company,
         reason: reason,
-        recallDate: this.parseFSISDate(recallDate),
+        recallDate: this.parseFSISDate(recallDateRaw),
         agency: 'FSIS',
         riskLevel: this.determineRiskLevel(reason),
-        category: this.determineCategory(productName),
-        status: recall.Status || recall.status || 'Ongoing',
-        distribution: recall.Distribution || recall.distribution || 'Nationwide',
-        statesAffected: this.extractStates(recall.Distribution || recall.distribution),
+        category: this.determineCategory(conciseProduct),
+        status: recall.Status || recall.status || recall.field_recall_type || 'Ongoing',
+        distribution: distribution,
+        statesAffected: this.extractStates(distribution || recall.field_states),
         source: 'FSIS',
-        isActive: (recall.Status || '').toLowerCase() !== 'completed',
+        isActive: ((recall.Status || recall.field_active_notice || '') + '').toString().toLowerCase() !== 'false' && ((recall.Status || '') + '').toString().toLowerCase() !== 'completed',
         rawData: recall // Keep original data for reference
       };
     });
@@ -299,6 +348,10 @@ class RecallApiService {
     if (descLower.includes('fish') || descLower.includes('salmon') || descLower.includes('tuna') || descLower.includes('seafood') || descLower.includes('shrimp')) 
       return 'seafood';
     
+    // Snacks (prefer snack classification for items like chips, cookies, bars)
+    if (descLower.includes('cookie') || descLower.includes('candy') || descLower.includes('chocolate') || descLower.includes('snack') || descLower.includes('chip') || descLower.includes('cracker') || descLower.includes('bar') || descLower.includes('granola') || descLower.includes('pretzel') || descLower.includes('popcorn') || descLower.includes('jerky'))
+      return 'snacks';
+
     // Produce categories
     if (descLower.includes('spinach') || descLower.includes('lettuce') || descLower.includes('broccoli') || descLower.includes('vegetable') || descLower.includes('carrot')) 
       return 'vegetables';
@@ -316,8 +369,7 @@ class RecallApiService {
       return 'nuts';
     if (descLower.includes('bread') || descLower.includes('flour') || descLower.includes('grain')) 
       return 'grains';
-    if (descLower.includes('cookie') || descLower.includes('candy') || descLower.includes('chocolate')) 
-      return 'snacks';
+    
     if (descLower.includes('baby') || descLower.includes('infant')) 
       return 'baby-food';
     

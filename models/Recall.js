@@ -54,7 +54,8 @@ const recallSchema = new mongoose.Schema({
       'processed-foods',
       'beverages',
       'snacks',
-      'baby-food'
+      'baby-food',
+      'other'
     ],
     required: true
   },

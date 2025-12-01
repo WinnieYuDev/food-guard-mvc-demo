@@ -3,7 +3,7 @@ const router = express.Router();
 const recallsController = require('../controllers/recalls');
 
 // Debug: Check if controller functions exist
-console.log('🔍 Recalls controller loaded:', {
+console.log('Recalls controller loaded:', {
   getRecalls: typeof recallsController.getRecalls,
   getRecall: typeof recallsController.getRecall,
   lookupProduct: typeof recallsController.lookupProduct,
@@ -12,6 +12,9 @@ console.log('🔍 Recalls controller loaded:', {
 
 // Main recalls page - uses live API data only
 router.get('/', recallsController.getRecalls);
+
+// Server-side news proxy to fetch FDA recall news
+router.get('/news', recallsController.getNews);
 
 // Single recall detail page - uses live API data
 router.get('/:id', recallsController.getRecall);
@@ -28,7 +31,7 @@ router.get('/debug/apis', async (req, res) => {
     const recallApiService = require('../services/recallAPI');
     const axios = require('axios');
     
-    console.log('🧪 Testing government APIs...');
+    console.log('Testing government APIs...');
     
     // Test FDA API
     let fdaStatus = 'unknown';
@@ -39,10 +42,10 @@ router.get('/debug/apis', async (req, res) => {
       });
       fdaStatus = 'working';
       fdaCount = fdaResponse.data.results?.length || 0;
-      console.log('✅ FDA API working:', fdaCount, 'recalls');
+      console.log('FDA API working:', fdaCount, 'recalls');
     } catch (fdaError) {
       fdaStatus = 'failed: ' + fdaError.message;
-      console.log('❌ FDA API failed:', fdaError.message);
+      console.log('FDA API failed:', fdaError.message);
     }
     
     // Test FSIS API
@@ -54,10 +57,10 @@ router.get('/debug/apis', async (req, res) => {
       });
       fsisStatus = 'working';
       fsisCount = Array.isArray(fsisResponse.data) ? fsisResponse.data.length : 'unknown';
-      console.log('✅ FSIS API working:', fsisCount, 'recalls');
+      console.log('FSIS API working:', fsisCount, 'recalls');
     } catch (fsisError) {
       fsisStatus = 'failed: ' + fsisError.message;
-      console.log('❌ FSIS API failed:', fsisError.message);
+      console.log('FSIS API failed:', fsisError.message);
     }
     
     // Test our recall service
@@ -67,10 +70,10 @@ router.get('/debug/apis', async (req, res) => {
       const recalls = await recallApiService.fetchAllRecalls({ limit: 10 });
       serviceStatus = 'working';
       serviceCount = recalls.length;
-      console.log('✅ Recall service working:', serviceCount, 'recalls');
+      console.log('Recall service working:', serviceCount, 'recalls');
     } catch (serviceError) {
       serviceStatus = 'failed: ' + serviceError.message;
-      console.log('❌ Recall service failed:', serviceError.message);
+      console.log('Recall service failed:', serviceError.message);
     }
     
     res.json({
@@ -97,7 +100,7 @@ router.get('/debug/current', async (req, res) => {
   try {
     const recallApiService = require('../services/recallAPI');
     
-    console.log('🔍 Fetching current recalls from APIs...');
+    console.log('Fetching current recalls from APIs...');
     const recalls = await recallApiService.fetchAllRecalls({ limit: 20 });
     
     res.json({

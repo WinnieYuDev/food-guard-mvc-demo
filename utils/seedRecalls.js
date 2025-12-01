@@ -224,11 +224,11 @@ const seedDatabase = async () => {
   try {
     // Clear existing recalls
     await Recall.deleteMany({});
-    console.log('🗑️  Cleared existing recalls');
+    console.log('Cleared existing recalls');
     
     // Insert new recalls
     await Recall.insertMany(seedRecalls);
-    console.log(`✅ Seeded ${seedRecalls.length} recalls into database`);
+    console.log(`Seeded ${seedRecalls.length} recalls into database`);
     
     return seedRecalls.length;
   } catch (error) {
@@ -242,15 +242,15 @@ if (require.main === module) {
   require('dotenv').config();
   mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/foodguard')
     .then(() => {
-      console.log('📦 Connected to MongoDB');
+      console.log('Connected to MongoDB');
       return seedDatabase();
     })
     .then(count => {
-      console.log(`🎉 Successfully seeded ${count} recalls!`);
+      console.log(`Successfully seeded ${count} recalls!`);
       process.exit(0);
     })
     .catch(error => {
-      console.error('💥 Seeding failed:', error);
+      console.error('Seeding failed:', error);
       process.exit(1);
     });
 }
