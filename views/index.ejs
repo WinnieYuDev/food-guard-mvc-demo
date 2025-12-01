@@ -42,19 +42,18 @@
                     <div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all duration-300 border border-usda-gray-200">
                         <div class="relative">
                             <!-- Use the new categoryImage property -->
-                            <img src="<%= recall.categoryImage || recall.image || '/imgs/placeholder-food.jpg' %>" 
-                                 alt="<%= recall.title || 'Food Recall' %>" 
+                            <img src="<%= recall.categoryImage || recall.image || '/imgs/placeholder-food.png' %>" 
+                                 alt="<%= recall.cleanedTitle || recall.title || 'Food Recall' %>" 
                                  class="w-full h-48 object-cover">
                             
-                            <!-- Image Overlay with Recall Title & Reason -->
+                            <!-- Image Overlay with Recall Title -->
                             <div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end">
                                 <div class="p-4 text-white">
-                                    <h3 class="font-bold text-lg leading-tight"><%= recall.title %></h3>
-                                    <p class="text-sm opacity-90 mt-1"><%= recall.reason %></p>
+                                    <h3 class="font-bold text-lg leading-tight"><%= recall.cleanedTitle || recall.title %></h3>
                                 </div>
                             </div>
                             
-                            <!-- Risk level badge - FIXED SYNTAX -->
+                            <!-- Risk level badge -->
                             <div class="absolute top-3 right-3">
                                 <% 
                                 // Calculate badge styles safely
@@ -79,7 +78,7 @@
                         <!-- Card Body Content -->
                         <div class="p-4">
                             <p class="text-usda-gray-600 text-sm mb-3 line-clamp-2">
-                                <%= recall.description || 'No detailed description available.' %>
+                                <%= recall.cleanedReason || recall.reason || recall.description || 'No detailed description available.' %>
                             </p>
                             <div class="flex justify-between items-center text-xs text-usda-gray-500">
                                 <span class="flex items-center">
@@ -98,7 +97,7 @@
                                     <% } %>
                                 </span>
                                 <span class="bg-usda-gray-100 px-2 py-1 rounded">
-                                    <%= recall.agency || recall.source || 'Official' %>
+                                    <%= recall.locations || recall.distribution || 'Various Regions' %>
                                 </span>
                             </div>
                         </div>
@@ -118,68 +117,67 @@
         <% } %>
     </section>
 
-ejs
-<!-- Recent Community Posts -->
-<section>
-    <h2 class="text-2xl font-bold text-usda-gray-900 mb-6">Recent Community Discussions</h2>
-    
-    <% if (posts.length > 0) { %>
-        <div class="bg-white rounded-xl shadow-sm divide-y divide-usda-gray-200 border border-usda-gray-200">
-            <% posts.forEach(post => { %>
-                <div class="p-6 hover:bg-usda-gray-50 transition-colors">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-lg font-semibold text-usda-gray-900"><%= post.title %></h3>
-                        <% 
-                        // Determine badge class and text
-                        let badgeClass = 'bg-usda-blue/10 text-usda-blue';
-                        let badgeText = 'General';
-                        
-                        if (post.category === 'recall-discussion') {
-                            badgeClass = 'bg-usda-red/10 text-usda-red';
-                            badgeText = 'recall discussion';
-                        } else if (post.category === 'safety-tips') {
-                            badgeClass = 'bg-usda-green/10 text-usda-green';
-                            badgeText = 'safety tips';
-                        }
-                        %>
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium <%= badgeClass %>">
-                            <%= badgeText %>
-                        </span>
-                    </div>
-                    <p class="text-usda-gray-600 mb-4 line-clamp-2"><%= post.content %></p>
-                    <div class="flex items-center justify-between text-sm text-usda-gray-500">
-                        <div class="flex items-center space-x-2">
-                            <div class="w-6 h-6 bg-usda-blue rounded-full flex items-center justify-center">
-                                <span class="text-white text-xs font-medium">
-                                    <% if (post.author && post.author.username) { %>
-                                        <%= post.author.username.charAt(0).toUpperCase() %>
-                                    <% } else { %>
-                                        U
-                                    <% } %>
-                                </span>
-                            </div>
-                            <span>By <%= post.author && post.author.username ? post.author.username : 'User' %></span>
+    <!-- Recent Community Posts -->
+    <section>
+        <h2 class="text-2xl font-bold text-usda-gray-900 mb-6">Recent Community Discussions</h2>
+        
+        <% if (posts.length > 0) { %>
+            <div class="bg-white rounded-xl shadow-sm divide-y divide-usda-gray-200 border border-usda-gray-200">
+                <% posts.forEach(post => { %>
+                    <div class="p-6 hover:bg-usda-gray-50 transition-colors">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold text-usda-gray-900"><%= post.title %></h3>
+                            <% 
+                            // Determine badge class and text
+                            let badgeClass = 'bg-usda-blue/10 text-usda-blue';
+                            let badgeText = 'General';
+                            
+                            if (post.category === 'recall-discussion') {
+                                badgeClass = 'bg-usda-red/10 text-usda-red';
+                                badgeText = 'recall discussion';
+                            } else if (post.category === 'safety-tips') {
+                                badgeClass = 'bg-usda-green/10 text-usda-green';
+                                badgeText = 'safety tips';
+                            }
+                            %>
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium <%= badgeClass %>">
+                                <%= badgeText %>
+                            </span>
                         </div>
-                        <span>
-                            <% if (post.createdAt) { %>
-                                <%= new Date(post.createdAt).toLocaleDateString() %>
-                            <% } else { %>
-                                Recently
-                            <% } %>
-                        </span>
+                        <p class="text-usda-gray-600 mb-4 line-clamp-2"><%= post.content %></p>
+                        <div class="flex items-center justify-between text-sm text-usda-gray-500">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-6 h-6 bg-usda-blue rounded-full flex items-center justify-center">
+                                    <span class="text-white text-xs font-medium">
+                                        <% if (post.author && post.author.username) { %>
+                                            <%= post.author.username.charAt(0).toUpperCase() %>
+                                        <% } else { %>
+                                            U
+                                        <% } %>
+                                    </span>
+                                </div>
+                                <span>By <%= post.author && post.author.username ? post.author.username : 'User' %></span>
+                            </div>
+                            <span>
+                                <% if (post.createdAt) { %>
+                                    <%= new Date(post.createdAt).toLocaleDateString() %>
+                                <% } else { %>
+                                    Recently
+                                <% } %>
+                            </span>
+                        </div>
                     </div>
-                </div>
-            <% }); %>
-        </div>
-        <div class="mt-6 text-center">
-            <a href="/posts" class="inline-flex items-center text-usda-blue hover:text-usda-darkblue font-semibold">
-                Join the Discussion
-                <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
-                </svg>
-            </a>
-        </div>
-    <% } else { %>
+                <% }); %>
+            </div>
+            <div class="mt-6 text-center">
+                <a href="/posts" class="inline-flex items-center text-usda-blue hover:text-usda-darkblue font-semibold">
+                    Join the Discussion
+                    <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                    </svg>
+                </a>
+            </div>
+        <% } else { %>
             <div class="bg-white rounded-xl shadow-sm p-8 text-center border border-usda-gray-200">
                 <div class="w-16 h-16 bg-usda-blue rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

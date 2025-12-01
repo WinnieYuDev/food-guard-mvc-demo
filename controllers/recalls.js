@@ -3,6 +3,125 @@ const recallApiService = require('../services/recallAPI');
 const axios = require('axios');
 const https = require('https');
 
+// Helper to extract clean brand/manufacturer name from long strings
+const cleanBrandName = (brandText) => {
+  if (!brandText) return 'Unknown Brand';
+  
+  let cleaned = brandText;
+  
+  // Remove addresses and location info (street addresses, cities, states, zip codes)
+  cleaned = cleaned.replace(/,?\s*\d+\s+[A-Za-z\s]+(?:Ave|Avenue|St|Street|Rd|Road|Blvd|Boulevard|Dr|Drive|Ln|Lane|Way|Court|Ct|Place|Pl)\.?[,\s]*/gi, '');
+  cleaned = cleaned.replace(/,?\s*[A-Z][a-z]+,\s*[A-Z]{2}\s*\d{5}(-\d{4})?/g, ''); // City, ST 12345
+  cleaned = cleaned.replace(/,?\s*[A-Z]{2}\s*\d{5}(-\d{4})?/g, ''); // ST 12345
+  
+  // Take only the first part if comma-separated (before address/city)
+  if (cleaned.includes(',')) {
+    cleaned = cleaned.split(',')[0].trim();
+  }
+  
+  // Also split on period if it looks like end of company name before address
+  // e.g., "Echo Lake Foods, Inc." or "Twin Marquis Inc. Brooklyn"
+  const parts = cleaned.split('.');
+  if (parts.length > 1) {
+    // Keep parts that look like company suffixes (Inc, LLC, Corp, etc.)
+    const companyName = [];
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i].trim();
+      if (!part) continue;
+      
+      companyName.push(part);
+      
+      // If this part ends with a company suffix, stop here
+      if (/\b(Inc|LLC|Corp|Corporation|Co|Company|Ltd|Limited)$/i.test(part)) {
+        break;
+      }
+    }
+    cleaned = companyName.join('.') + (companyName[companyName.length - 1].match(/\b(Inc|LLC|Corp|Co|Ltd)$/i) ? '.' : '');
+  }
+  
+  cleaned = cleaned.trim();
+  return cleaned || 'Unknown Brand';
+};
+
+// Helper to clean up product titles by removing extraneous details
+const cleanProductTitle = (title) => {
+  if (!title) return 'Unknown Product';
+  
+  let cleaned = title;
+  
+  // Remove everything after common separators that indicate extra info
+  const stopPhrases = [
+    /\s+(?:bag\s+)?contains:/i,
+    /\s+manufactured\s+for:/i,
+    /\.\s*net\s+wt/i,
+    /\s+net\s+wt\.?/i,
+    /;\s*net\s+wt/i,
+    /;\s*ingredients:/i,
+    /\.\s*bulk\./i,
+    /\s+bulk\./i,
+    /\.\s*keep\s+frozen/i,
+    /\s+keep\s+frozen/i,
+    /;\s*produced\s+on/i,
+    /;\s*manufactured\s+by:/i,
+    /\.\s*manufactured\s+by:/i,
+    /\s+manufactured\s+by:/i,
+    /;\s*upc#?\s+/i,
+    /\s+\d+\s+count\/case/i,
+    /\bnet\s+weight:/i,
+    /\bstates?\s+affected:/i,
+    /\bzip\s*codes?:/i,
+    /\bdistribution:/i,
+    /\bdist\s+by:/i
+  ];
+  
+  for (const pattern of stopPhrases) {
+    const match = cleaned.match(pattern);
+    if (match) {
+      cleaned = cleaned.substring(0, match.index);
+      break;
+    }
+  }
+  
+  // Remove trailing "Bag", "Package", "Box" if at the end
+  cleaned = cleaned.replace(/\s+(bag|package|box|pack)\s*$/i, '');
+  
+  // Remove case/count info (e.g., "72 Count/Case", "12 Pack")
+  cleaned = cleaned.replace(/\s*\d+\s*(count|ct|pack|pk)\s*\/\s*(case|cs|box)\s*/gi, '');
+  
+  // Remove common junk prefixes and product codes
+  // e.g., "Echolakefoods Mf 3067 Cnfree" -> remove the manufacturer code parts
+  cleaned = cleaned.replace(/^[a-z]+\s+(mf|sku|item|code|#)\s*\d+\s*/i, '');
+  
+  // Remove specific unwanted patterns
+  cleaned = cleaned.replace(/\b(cnfree|cage\s*free)\s+(cage\s*free)\b/gi, 'Cage Free'); // dedupe "cnfree cage free"
+  cleaned = cleaned.replace(/\bcnfree\b/gi, 'Cage Free'); // convert cnfree to readable
+  cleaned = cleaned.replace(/\biaf\b/gi, 'IAF'); // normalize IAF
+  
+  // Remove common weight patterns (e.g., "12 oz", "1.5 lbs", "400g")
+  cleaned = cleaned.replace(/\b\d+(\.\d+)?\s*(oz|lb|lbs|g|kg|ml|l)\b/gi, '');
+  
+  // Remove date patterns (MM/DD/YYYY, YYYY-MM-DD)
+  cleaned = cleaned.replace(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g, '');
+  cleaned = cleaned.replace(/\b\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}\b/g, '');
+  
+  // Remove UPC/barcode patterns
+  cleaned = cleaned.replace(/\bupc[\s:]*([\d\s]+)/gi, '');
+  cleaned = cleaned.replace(/\bbarcode[\s:]*([\d\s]+)/gi, '');
+  
+  // Remove standalone periods and extra dots
+  cleaned = cleaned.replace(/\s*\.\s*\.\s*/g, ' ');
+  cleaned = cleaned.replace(/\.\s*$/g, '');
+  
+  // Clean up extra whitespace and punctuation
+  cleaned = cleaned.replace(/\s*[;,]\s*$/g, ''); // trailing semicolons/commas
+  cleaned = cleaned.replace(/;\s*;+/g, ''); // double+ semicolons anywhere
+  cleaned = cleaned.replace(/;\s*$/g, ''); // trailing semicolons
+  cleaned = cleaned.replace(/\s+/g, ' '); // multiple spaces
+  cleaned = cleaned.trim();
+  
+  return cleaned || 'Unknown Product';
+};
+
 // Small helper to fetch JSON via native https to avoid axios timeouts in some environments
 const fetchJson = (url, timeout = 8000) => new Promise((resolve, reject) => {
   const req = https.get(url, { timeout }, (res) => {
@@ -534,12 +653,39 @@ exports.lookupProduct = async (req, res) => {
     };
 
     // Build product payload favoring OpenFoodFacts when available
+    let productName_clean = productName || 'Product Lookup';
+    let brandName = 'N/A';
+    let productBarcode = barcode || 'N/A';
+    let productIngredients = 'N/A';
+    
+    if (offProduct) {
+      // Extract and clean product name
+      productName_clean = offProduct.product_name || offProduct.generic_name || offProduct.abbreviated_product_name || productName_clean;
+      
+      // Extract brand (OFF sometimes has comma-separated brands)
+      if (offProduct.brands) {
+        const brandList = String(offProduct.brands).split(',').map(b => b.trim()).filter(Boolean);
+        brandName = brandList[0] || 'N/A';
+      } else if (Array.isArray(offProduct.brands_tags) && offProduct.brands_tags.length > 0) {
+        brandName = offProduct.brands_tags[0].replace(/^en:/, '').trim();
+      }
+      
+      // Extract barcode
+      productBarcode = offProduct.code || offProduct._id || productBarcode;
+      
+      // Extract ingredients
+      productIngredients = offProduct.ingredients_text || offProduct.ingredients_text_with_allergens || productIngredients;
+    } else if (relatedRecalls && relatedRecalls.length > 0) {
+      // Fallback to recall data if OFF didn't return anything
+      brandName = relatedRecalls[0].brand || 'N/A';
+    }
+    
     const productPayload = {
-      name: (offProduct && (offProduct.product_name || offProduct.generic_name)) || productName || 'Product Lookup',
-      barcode: (offProduct && (offProduct.code || offProduct._id)) || barcode || 'N/A',
-      brand: (offProduct && (offProduct.brands || offProduct.brands_tags && offProduct.brands_tags[0])) || (relatedRecalls && relatedRecalls.length > 0 ? relatedRecalls[0].brand : 'N/A'),
+      name: cleanProductTitle(productName_clean),
+      barcode: productBarcode,
+      brand: brandName,
       allergens: [],
-      ingredients: (offProduct && (offProduct.ingredients_text || offProduct.ingredients_text_with_allergens)) || 'N/A',
+      ingredients: productIngredients,
       nutritionFacts: null,
       searchTerm: searchTerm
     };
@@ -801,33 +947,80 @@ exports.normalizeRecallData = (recall) => {
   const allowedRetailers = ['trader-joes','whole-foods','kroger','walmart','costco','target','safeway','albertsons','various-retailers'];
   if (!allowedRetailers.includes(retailerSlug)) retailerSlug = 'various-retailers';
 
+  // Clean product and brand strings
+  const rawProduct = (recall.product || recall.product_description || recall.title || '').toString();
+  const rawBrand = (recall.brand || recall.recalling_firm || recall.Firm || '').toString();
+  
+  let cleanedProduct = cleanProductTitle(rawProduct);
+  let cleanedBrand = cleanBrandName(rawBrand);
+  
+  // Check if product already contains a brand name at the start
+  // Look for common brand patterns: 2-3 capitalized words at the beginning
+  const productLower = cleanedProduct.toLowerCase();
+  const brandLower = cleanedBrand.toLowerCase();
+  
+  // Extract potential brand from product if it looks like "Brand Name Product Description"
+  const brandPattern = /^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\s+/;
+  const brandMatch = cleanedProduct.match(brandPattern);
+  
+  let extractedBrand = null;
+  if (brandMatch) {
+    const potentialBrand = brandMatch[1];
+    // Common food brands that might appear (this is a heuristic)
+    const knownBrands = ['cabot', 'kraft', 'nestle', 'kellogg', 'general mills', 'post', 'quaker', 'nabisco', 'pepperidge', 'tyson'];
+    if (knownBrands.some(kb => potentialBrand.toLowerCase().includes(kb))) {
+      extractedBrand = potentialBrand;
+      cleanedProduct = cleanedProduct.substring(potentialBrand.length).trim();
+      // Use extracted brand if current brand looks like a distributor or is generic
+      if (brandLower.includes('inc') || brandLower.includes('llc') || brandLower.includes('foods')) {
+        cleanedBrand = extractedBrand;
+      }
+    }
+  }
+  
+  // If cleaned product starts with the current brand name, split them
+  if (brandLower !== 'unknown brand' && productLower.startsWith(brandLower)) {
+    cleanedProduct = cleanedProduct.substring(cleanedBrand.length).trim();
+  }
+  
+  // Also check if brand appears at the start of product (word boundary)
+  const brandWords = cleanedBrand.split(/\s+/).filter(w => w.length > 2);
+  if (brandWords.length > 0) {
+    const firstBrandWord = brandWords[0].toLowerCase();
+    if (productLower.startsWith(firstBrandWord)) {
+      // Check if multiple brand words match
+      let matchedLength = 0;
+      for (const word of brandWords) {
+        const regex = new RegExp(`^${word}\\s*`, 'i');
+        const remaining = cleanedProduct.substring(matchedLength);
+        if (regex.test(remaining)) {
+          matchedLength += remaining.match(regex)[0].length;
+        } else {
+          break;
+        }
+      }
+      if (matchedLength > 0) {
+        cleanedProduct = cleanedProduct.substring(matchedLength).trim();
+      }
+    }
+  }
+  
+  // Build title from cleaned product and brand in format: "Product — Brand"
+  const titleParts = [];
+  if (cleanedProduct && cleanedProduct !== 'Unknown Product') titleParts.push(cleanedProduct);
+  if (cleanedBrand && cleanedBrand !== 'Unknown Brand' && cleanedBrand !== cleanedProduct) titleParts.push(cleanedBrand);
+  const finalTitle = titleParts.length > 0 ? titleParts.join(' — ') : (recall.title || 'Product Recall');
+
   return {
     // Core identification
     _id: recall._id,
     recallId: recall.recallId || recall.recall_number || `RECALL-${Date.now()}`,
     
     // Product information
-    // Clean up title/product to avoid duplicated long ingredient lists
-    // Prefer product name and brand only
-    // We'll sanitize common trailing blocks like INGREDIENTS:, CONTAINS:, UPC, DIST BY:
-    title: (function() {
-      const prodRaw = (recall.product || recall.product_description || recall.title || '').toString();
-      const brandRaw = (recall.brand || recall.recalling_firm || recall.Firm || '').toString();
-      // Remove everything from common delimiters onward
-      const cleanedProd = prodRaw.replace(/\s*(INGREDIENTS:|CONTAINS:|UPC\b|DIST\s*BY:|DISTRIBUTION:|INGREDIENTS\.)[\s\S]*$/i, '').trim();
-      const cleanedBrand = brandRaw.replace(/[\n\r]+/g, ' ').trim();
-      const titleParts = [];
-      if (cleanedProd) titleParts.push(cleanedProd);
-      if (cleanedBrand) titleParts.push(cleanedBrand);
-      return titleParts.length > 0 ? titleParts.join(' — ') : (recall.title || 'Product Recall');
-    })(),
-
+    title: finalTitle,
     description: recall.description || recall.reason_for_recall || 'No description available',
-    product: (function() {
-      const prodRaw = (recall.product || recall.product_description || '').toString();
-      return prodRaw.replace(/\s*(INGREDIENTS:|CONTAINS:|UPC\b|DIST\s*BY:|DISTRIBUTION:|INGREDIENTS\.)[\s\S]*$/i, '').trim() || 'Unknown Product';
-    })(),
-    brand: (recall.brand || recall.recalling_firm || recall.Firm || 'Unknown Brand'),
+    product: cleanedProduct,
+    brand: cleanedBrand,
     reason: recall.reason || recall.reason_for_recall || 'Not specified',
     
     // Categorization
