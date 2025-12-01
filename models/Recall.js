@@ -7,6 +7,9 @@ const mongoose = require('mongoose');
 // You can add or remove fields here; if you change types, update any code
 // that reads or writes these fields (e.g., controllers and views).
 
+// === Schema Definition ===
+// Defines the shape of a recall document stored in MongoDB. Keep fields
+// aligned with the normalization logic in `controllers/recalls.js`.
 const recallSchema = new mongoose.Schema({
   // Unique identifier for the recall (comes from the source feed)
   recallId: {
@@ -121,6 +124,8 @@ const recallSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// === Indexes ===
+// Text index to support full-text search across common fields
 recallSchema.index({
   title: 'text',
   description: 'text', 
@@ -129,4 +134,5 @@ recallSchema.index({
   reason: 'text'
 });
 
+// === Model Export ===
 module.exports = mongoose.model('Recall', recallSchema);

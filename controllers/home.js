@@ -13,6 +13,10 @@ const Post = require('../models/Post');
 const Recall = require('../models/Recall');
 const recallsController = require('./recalls');
 
+// === Constants: Image maps ===
+// Maps used to select representative images for recall cards. `categoryImageMap`
+// is used when no specific keyword matches are found; `keywordImageMap`
+// contains more specific phrase-based overrides.
 const categoryImageMap = {
     'poultry': 'https://images.unsplash.com/photo-1587590227264-0ac64ce63ce8?w=800&h=600&fit=crop',
     'beef': 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=800&h=600&fit=crop',
@@ -37,6 +41,7 @@ const getCategoryImage = (category) => {
 };
 
 
+// === Constants: Keyword -> Image overrides ===
 const keywordImageMap = {
     'scrambled eggs': 'https://images.unsplash.com/photo-1608039829572-78524f79c4c7?w=800&h=600&fit=crop',
     'scrambled egg': 'https://images.unsplash.com/photo-1608039829572-78524f79c4c7?w=800&h=600&fit=crop',
@@ -92,6 +97,9 @@ const keywordImageMap = {
     baby: 'https://www.foodbusinessnews.net/ext/resources/2020/3/Baby-Food_Lead.webp?height=667&t=1584542595&width=1080'
 };
 
+// === Helpers: Image selection and text cleaning ===
+// Functions that choose the best image URL and normalize display text for
+// the homepage recall cards.
 // selectImageFromText(text, fallbackCategory)
 // Scans the provided `text` (usually a combination of title, product, brand,
 // and category) for keywords defined in `keywordImageMap`. The function tries
@@ -120,6 +128,7 @@ const selectImageFromText = (text, fallbackCategory) => {
     return getCategoryImage(fallbackCategory);
 };
 
+// === Helpers: Title/Reason sanitizers ===
 // toTitleCase(s)
 // Returns a version of the string where the first letter of each word is
 // capitalized and the rest of the letters are lower-case. Useful for
@@ -210,13 +219,11 @@ const sanitizeReason = (reason, title) => {
     return r;
 };
 
-// getHome controller
-// Steps performed:
-// 1. Check DB connection and load active recall documents (most recent first).
-// 2. For each recall: normalize raw data, compute cleaned title/reason, derive
-//    affected locations, and pick an image URL via keyword/category lookup.
-// 3. Load recent community posts and render the `index` view with prepared
-//    `recalls` and `posts` arrays.
+// === Controller: Home page ===
+// getHome(req, res)
+// Prepares data for the homepage by loading active recalls and recent
+// posts, normalizing and sanitizing fields for display, and selecting images
+// for each recall card.
 exports.getHome = async (req, res) => {
     try {
         console.log('Home controller called');

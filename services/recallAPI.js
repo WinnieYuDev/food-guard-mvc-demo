@@ -1,3 +1,10 @@
+/**
+ * RecallApiService
+ *
+ * Service that fetches recall data from external providers (FDA openFDA
+ * and FSIS). It normalizes provider-specific payloads into a consistent
+ * application-level object shape used by controllers and the front-end.
+ */
 const axios = require('axios');
 
 class RecallApiService {
@@ -6,6 +13,13 @@ class RecallApiService {
     this.fsisBaseUrl = 'https://www.fsis.usda.gov/fsis/api/recall/v/1';
   }
 
+  /**
+   * fetchFDARecalls(options)
+   *
+   * Query the FDA openFDA enforcement endpoint and return normalized recall
+   * objects. `options` may include `limit`, `search`, and `monthsBack` to
+   * filter the results. On failure a simpler fallback query is attempted.
+   */
   async fetchFDARecalls(options = {}) {
     const { limit = 50, search = '', monthsBack = 5 } = options;
     try {
@@ -57,6 +71,13 @@ class RecallApiService {
     }
   }
 
+  /**
+   * searchRecalls(searchTerm, limit)
+   *
+   * Perform a parallel search against both FDA and FSIS and return a
+   * merged, date-sorted list limited to `limit` entries. Used for product
+   * lookup features where both sources are relevant.
+   */
   async searchRecalls(searchTerm, limit = 20) {
     try {
       const filters = { search: searchTerm, limit, monthsBack: 12 };
@@ -77,6 +98,12 @@ class RecallApiService {
     }
   }
 
+  /**
+   * fetchFSISRecalls(options)
+   *
+   * Query the FSIS recall API and map results to the normalized recall
+   * shape. Supports basic date filtering (`monthsBack`) and text search.
+   */
   async fetchFSISRecalls(options = {}) {
     try {
       const { limit = 50, monthsBack = 5, search = '' } = options;
@@ -124,6 +151,13 @@ class RecallApiService {
     }
   }
 
+  /**
+   * fetchAllRecalls(filters)
+   *
+   * High-level convenience method that attempts to fetch recalls from both
+   * FDA and FSIS, merges the results, sorts by date and returns the top
+   * `limit` entries. Falls back to mock data if external APIs fail.
+   */
   async fetchAllRecalls(filters = {}) {
     try {
       console.log('Starting to fetch all recalls...');
@@ -166,6 +200,8 @@ class RecallApiService {
     }
   }
 
+  // === Utilities ===
+  // Small helper utilities used when transforming/parsing provider data.
   parseFSISDate(dateString) {
     if (!dateString) return new Date();
     
@@ -181,6 +217,10 @@ class RecallApiService {
     }
   }
 
+  // === Transformers ===
+  // Map provider-specific payloads into the application's normalized recall
+  // object shape. These functions isolate field mappings and any cleanup
+  // required for each provider.
   transformFDAData(fdaData) {
     if (!Array.isArray(fdaData)) return [];
     

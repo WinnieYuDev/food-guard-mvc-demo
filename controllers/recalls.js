@@ -1,8 +1,26 @@
+/**
+ * Recalls Controller
+ *
+ * Responsible for handling requests related to product recalls. This module
+ * provides controller actions used by Express routes (rendering the recalls
+ * page, returning JSON for the API, normalizing recall data, and
+ * synchronizing/storing API results in the local database).
+ *
+ * Key exported functions:
+ *  - getRecalls(req, res): render the recalls page (supports search, filters)
+ *  - normalizeRecallData(recall): normalize / clean incoming recall objects
+ *  - saveApiResultsToDB(apiRecalls): persist normalized API results to DB
+ *  - reNormalizeAllRecalls(): migration utility to re-run normalization
+ *  - getNews(req, res): server-side proxy to fetch recent FDA news
+ */
 const Recall = require('../models/Recall');
 const recallApiService = require('../services/recallAPI');
 const axios = require('axios');
 const https = require('https');
 
+// === Helpers: Text normalization ===
+// Functions that clean and normalize free-form text fields (brand, product)
+// so titles and labels can be consistently displayed and indexed.
 const cleanBrandName = (brandText) => {
   if (!brandText) return 'Unknown Brand';
   
@@ -190,6 +208,23 @@ const fetchJson = (url, timeout = 8000) => new Promise((resolve, reject) => {
   });
 });
 
+/**
+ * getRecalls
+ *
+ * Renders the recalls listing page. Supports optional query parameters for
+ * pagination, search, category, retailer, riskLevel and sorting. The handler
+ * will attempt to fetch live API data (FDA/FSIS) quickly and fall back to the
+ * local database if the API does not respond in time or when requested.
+ *
+ * Flow:
+ *  - Build filter criteria from request
+ *  - Try a short-lived API fetch (non-blocking for page load)
+ *  - Apply server-side filtering/sorting and normalize results
+ *  - Render the `recalls` template with prepared data (and option lists)
+ */
+// === Controller Actions ===
+// Public route handlers used by Express. These prepare data for rendering
+// or return JSON for API consumers.
 exports.getRecalls = async (req, res) => {
   try {
     console.log('Query parameters:', req.query);
@@ -845,6 +880,22 @@ exports.syncRecalls = async (req, res) => {
   }
 };
 
+/**
+ * normalizeRecallData(recall)
+ *
+ * Take a raw recall object (from DB or external API) and produce a
+ * normalized plain object with consistent fields used by the UI and DB.
+ * Normalization includes:
+ *  - parsing/normalizing dates into a JS Date
+ *  - cleaning product and brand text
+ *  - constructing a readable title (`Product — Brand`)
+ *  - inferring a category (with sensible fallbacks)
+ *  - generating a safe `articleLink` (prefer explicit link, otherwise an FDA search URL)
+ *  - normalizing retailer, distribution and other fields
+ */
+// === Normalization Utilities ===
+// Convert raw recall payloads (from DB or external APIs) into a consistent
+// in-memory object shape consumed by templates and persisted to MongoDB.
 exports.normalizeRecallData = (recall) => {
   if (!recall) return null;
 
@@ -1065,6 +1116,18 @@ exports.normalizeRecallData = (recall) => {
   };
 };
 
+/**
+ * saveApiResultsToDB(apiRecalls)
+ *
+ * Persist an array of normalized recalls into the local MongoDB collection.
+ * For each normalized recall the function checks whether a document with the
+ * same `recallId` exists; if not it creates one, otherwise it updates the
+ * existing document. Returns the count of newly created documents.
+ */
+// === Persistence Utilities ===
+// Functions that persist normalized recalls to the database and perform
+// migration-like operations (re-normalization) when normalization logic
+// changes.
 exports.saveApiResultsToDB = async (apiRecalls) => {
   if (!apiRecalls || !Array.isArray(apiRecalls)) return 0;
   
@@ -1096,6 +1159,15 @@ exports.saveApiResultsToDB = async (apiRecalls) => {
   return savedCount;
 };
 
+/**
+ * reNormalizeAllRecalls()
+ *
+ * Migration utility used to re-run the normalization logic against all
+ * existing recall documents in the database. This is useful after
+ * improving normalization heuristics to persist the cleaned values.
+ *
+ * WARNING: This iterates all recalls and performs updates in-place.
+ */
 exports.reNormalizeAllRecalls = async () => {
   try {
     console.log('Starting re-normalization of all recalls in database...');
@@ -1135,6 +1207,13 @@ exports.reNormalizeAllRecalls = async () => {
   }
 };
 
+/**
+ * getNews(req, res)
+ *
+ * Server-side proxy endpoint to fetch recent FDA recall news. It uses the
+ * recall API service to query FDA and returns normalized results suitable
+ * for client-side rendering in the news sidebar.
+ */
 exports.getNews = async (req, res) => {
   try {
     const recallApi = require('../services/recallAPI');

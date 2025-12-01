@@ -1,6 +1,21 @@
+/**
+ * FoodGuard - Server entrypoint
+ *
+ * Boots the Express application and wires up middleware, session store,
+ * authentication, routes and starts the HTTP server once MongoDB is
+ * connected. Intended as the single start point for local development
+ * and simple deployments.
+ *
+ * High-level flow:
+ *  - Load environment configuration
+ *  - Initialize Express, sessions and Passport
+ *  - Mount route modules: main, auth, recalls, posts
+ *  - Start server after connecting to MongoDB
+ */
 require('dotenv').config();
 
-const express = require('express'); // Main web framework
+const express = require('express');
+// Main web framework
 const session = require('express-session'); // For user sessions
 const passport = require('passport'); // For authentication
 const MongoStore = require('connect-mongo'); // Store sessions in MongoDB
@@ -9,16 +24,23 @@ const path = require('path'); // For working with file paths
 
 const app = express();
 
+// === Database Connection ===
+// Establishes MongoDB connection used by the session store and application.
 const connectDB = require('./config/database');
 
+// === Authentication Initialization ===
+// Configure Passport strategies and serialization logic
 require('./config/passport')(passport);
 
 
+// === Middleware: Body Parsing ===
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// === Middleware: Static Files ===
 app.use(express.static(path.join(__dirname, 'public')));
 
+// === Middleware: Sessions ===
 app.use(session({
   secret: process.env.SESSION_SECRET, // Secret key to encrypt sessions
   resave: false, // Don't save session if nothing changed
@@ -31,9 +53,12 @@ app.use(session({
   }
 }));
 
+
+// === Middleware: Authentication ===
 app.use(passport.initialize());
 app.use(passport.session());
 
+// === Middleware: Flash messages ===
 app.use(flash());
 
 
@@ -53,6 +78,8 @@ app.use('/', require('./routes/main')); // Homepage and dashboard
 app.use('/auth', require('./routes/auth')); // Login and signup
 app.use('/recalls', require('./routes/recalls')); // Food recalls
 app.use('/posts', require('./routes/posts')); // Forum posts
+// Docs route (serves DATA_FLOW.md when enabled by env)
+app.use('/docs', require('./routes/docs'));
 
 
 app.use((req, res) => {
