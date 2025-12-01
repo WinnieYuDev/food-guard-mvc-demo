@@ -1,3 +1,14 @@
+// controllers/home.js
+// Purpose: prepare data for the homepage (views/index.ejs).
+// This file loads recent posts and active recalls from the database,
+// cleans up recall titles/reasons for nicer display, chooses an image
+// to show for each recall card, and sends the data to the EJS view.
+//
+// - `Recall.find(...).lean()` returns plain JavaScript objects (not Mongoose documents),
+//   which are easier to inspect and modify before passing to templates.
+// - Small helper functions below (sanitizeTitle, selectImageFromText, etc.)
+//   keep the view simple by preparing display-ready fields.
+
 const Post = require('../models/Post');
 const Recall = require('../models/Recall');
 const recallsController = require('./recalls');
@@ -81,35 +92,57 @@ const keywordImageMap = {
     baby: 'https://www.foodbusinessnews.net/ext/resources/2020/3/Baby-Food_Lead.webp?height=667&t=1584542595&width=1080'
 };
 
+// selectImageFromText(text, fallbackCategory)
+// Scans the provided `text` (usually a combination of title, product, brand,
+// and category) for keywords defined in `keywordImageMap`. The function tries
+// to match longer keywords first so that specific phrases (e.g. "scrambled eggs")
+// are preferred over shorter ones (e.g. "egg"). If a keyword is found, the
+// corresponding image URL is returned. Otherwise, the category fallback image
+// is returned via `getCategoryImage`.
 const selectImageFromText = (text, fallbackCategory) => {
     if (!text) return getCategoryImage(fallbackCategory);
-    
+
     const normalized = text.toLowerCase();
-    
+
+    // Sort keys by length (longer keys first) to prioritize specific matches
     const sortedKeys = Object.keys(keywordImageMap).sort((a, b) => b.length - a.length);
-    
+
     for (const key of sortedKeys) {
         if (normalized.includes(key)) {
+            // Helpful debug log when running locally
             console.log(`Matched keyword "${key}" in text: "${text.substring(0, 50)}..."`);
             return keywordImageMap[key];
         }
     }
 
+    // No keyword matched; use the category-based image
     console.log(`Using category fallback for: "${fallbackCategory}"`);
     return getCategoryImage(fallbackCategory);
 };
 
+// toTitleCase(s)
+// Returns a version of the string where the first letter of each word is
+// capitalized and the rest of the letters are lower-case. Useful for
+// normalizing product and brand names for display.
 const toTitleCase = (s) => {
     if (!s) return s;
     return s.toLowerCase().replace(/\b(\w)/g, c => c.toUpperCase());
 };
 
+// removeWeightPatterns(s)
+// Removes weight and measurement mentions from text, such as "5 lb", "12 oz",
+// and parenthesized values like "(2 lbs)". This avoids cluttering titles
+// and reasons with irrelevant numeric measurements.
 const removeWeightPatterns = (s) => {
     if (!s) return s;
     return s.replace(/\b\d+(?:[\.,]\d+)?\s?(?:lbs?|pounds?|oz|ounces?|kgs?|kg|g)\b/ig, '')
             .replace(/\(\s*\d+(?:[\.,]\d+)?\s?(?:lbs?|pounds?|oz|ounces?|kgs?|kg|g)\s*\)/ig, '');
 };
 
+// dedupeCommaParts(s)
+// Splits a string on common separators and returns a deduplicated, comma-
+// separated string. Useful for cleaning `distribution` fields like
+// "CT, FL, IL, CT" -> "CT, FL, IL".
 const dedupeCommaParts = (s) => {
     if (!s) return s;
     const parts = s.split(/[,/\-]+/).map(p => p.trim()).filter(Boolean);
@@ -125,6 +158,9 @@ const dedupeCommaParts = (s) => {
     return out.join(', ');
 };
 
+// removeDuplicateAdjacentWords(s)
+// Removes immediate repeated words, preserving order. Example: "Fresh Fresh Eggs"
+// becomes "Fresh Eggs".
 const removeDuplicateAdjacentWords = (s) => {
     if (!s) return s;
     const words = s.split(/\s+/);
@@ -139,6 +175,12 @@ const removeDuplicateAdjacentWords = (s) => {
     return out.join(' ');
 };
 
+// sanitizeTitle(title)
+// Runs a series of small cleaning steps to produce a compact, readable title:
+// - remove measurements, collapse extra whitespace
+// - split and dedupe comma/dash parts
+// - remove duplicate adjacent words
+// - trim stray punctuation
 const sanitizeTitle = (title) => {
     if (!title) return title;
     let s = title;
@@ -151,6 +193,10 @@ const sanitizeTitle = (title) => {
     return s;
 };
 
+// sanitizeReason(reason, title)
+// Cleans the reason field by removing measurements and trimming whitespace.
+// If the reason repeats the title text, this function shortens the reason
+// to avoid duplicate information in the UI (prefers the first sentence).
 const sanitizeReason = (reason, title) => {
     if (!reason) return reason;
     let r = reason;
@@ -164,6 +210,13 @@ const sanitizeReason = (reason, title) => {
     return r;
 };
 
+// getHome controller
+// Steps performed:
+// 1. Check DB connection and load active recall documents (most recent first).
+// 2. For each recall: normalize raw data, compute cleaned title/reason, derive
+//    affected locations, and pick an image URL via keyword/category lookup.
+// 3. Load recent community posts and render the `index` view with prepared
+//    `recalls` and `posts` arrays.
 exports.getHome = async (req, res) => {
     try {
         console.log('Home controller called');

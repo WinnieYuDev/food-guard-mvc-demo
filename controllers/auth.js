@@ -22,7 +22,7 @@ exports.postLogin = (req, res, next) => {
 };
 
 exports.getSignup = (req, res) => {
-  res.render('signup', {  // ← Changed from 'auth/signup' to 'signup'
+  res.render('signup', {  // Changed from 'auth/signup' to 'signup'
     title: 'Sign Up - FoodGuard'
   });
 };

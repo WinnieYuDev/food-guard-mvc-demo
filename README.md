@@ -1,81 +1,73 @@
-# FoodGuard - Food Safety & Recall Alert System
+# FoodGuard — Food Safety & Recall Demo (MVC)
 
-Currently a work in progress! 
+FoodGuard is a small demo web app that collects food recall data and shows it in a friendly dashboard.
+It is built as an educational, beginner-friendly project using the classic MVC pattern (models, views, controllers).
 
+Screenshot: `public/imgs/website.jpg` (used in the project)
 
-FoodGuard is a comprehensive web application that helps users stay informed about food recalls, safety alerts, and product information. It integrates real-time data from multiple food safety APIs to provide up-to-date information about food recalls and product safety.
+Summary
+- Shows active food recalls and community posts on the homepage
+- Pulls/ingests recall data into MongoDB and renders simplified, readable cards
+- Simple user auth, post creation, and image uploads (Cloudinary)
 
-![alt text](/public/imgs/website.jpg)
+How data flows (high level)
+- A background importer or the `services/recallAPI.js` fetches recall data from public sources (FDA, etc.)
+- Data is stored as `Recall` documents in MongoDB (`models/Recall.js`)
+- `controllers/home.js` loads active recalls, cleans titles/reasons, and chooses an image for each card
+- `views/index.ejs` receives prepared fields (`cleanedTitle`, `cleanedReason`, `locations`, `categoryImage`) and renders the homepage
 
-## Features
+Main features
+- Active recall listing with risk-level badges and locations
+- Title/Reason sanitization to remove noise (weights, duplicate words, repeated locations)
+- Keyword-based image selection plus category fallbacks
+- Recent community posts and basic authentication
 
-### User Authentication
-- **User Registration & Login** - Secure user accounts with encrypted passwords
-- **Session Management** - Persistent login sessions with Passport.js
-- **Profile Management** - User profiles with avatar support
+Quick start (development)
+1. Clone:
+  ```powershell
+  git clone https://github.com/WinnieYuDev/food-guard-mvc-demo
+  cd food-guard-mvc-demo
+  ```
+2. Install dependencies:
+  ```powershell
+  npm install
+  ```
+3. Create a `.env` file in the project root or `config/` folder with these values (example):
+  ```text
+  PORT=3000
+  MONGODB_URI=mongodb://localhost:27017/foodguard_db
+  CLOUDINARY_CLOUD_NAME=your_cloud_name
+  CLOUDINARY_API_KEY=your_api_key
+  CLOUDINARY_API_SECRET=your_api_secret
+  NODE_ENV=development
+  ```
+4. Start the app:
+  ```powershell
+  npm start
+  ```
+5. Open `http://localhost:3000` in your browser.
 
-### Food Recall Monitoring
-- **Real-time Recall Data** - Integration with FDA Food Recall API
-- **Multiple Data Sources** - FDA, USDA, and Open Food Facts data
-- **Risk Level Classification** - Automatic classification of recalls by risk (High/Medium/Low)
-- **Search & Filtering** - Advanced search by product name, brand, risk level, and source
-- **Barcode Lookup** - Check specific products using barcode scanning
+Notes & tips for beginners
+- If the homepage images do not appear, check that URLs returned for `recall.categoryImage` are valid.
+  - Local image files should be under `public/imgs` and referenced with `/imgs/<filename>`.
+  - The mapping lives in `controllers/home.js` (look for `categoryImageMap` and `keywordImageMap`).
+- To change the homepage behavior (title cleaning, image selection), edit `controllers/home.js`. Helpers are small and documented there.
+- To seed sample data for testing, check `utils/seedRecalls.js` (if present) or insert documents in MongoDB using `mongo`/Compass.
 
-### Community Features
-- **Discussion Forum** - Community posts about food safety
-- **Comment System** - Engage with other users' posts
-- **Like System** - Like posts and comments
-- **Image Upload** - Share photos with posts (Cloudinary integration)
+Troubleshooting
+- If `node server.js` errors with EADDRINUSE, another process is using the port (stop it or change `PORT`).
+- If MongoDB fails to connect, verify `MONGODB_URI` and that MongoDB is running.
 
-### Modern UI/UX
-- **Responsive Design** - Works on desktop, tablet, and mobile
-- **Tailwind CSS** - Modern, clean interface
-- **Real-time Notifications** - Flash messages for user feedback
-- **Accessible Design** - WCAG compliant components
+Project structure (important files)
+- `server.js` — app bootstrap and route registration
+- `controllers/home.js` — prepares homepage data (sanitization + image selection)
+- `models/Recall.js` — Mongoose schema for recall records
+- `services/recallAPI.js` — external API fetch / import (where available)
+- `views/index.ejs` — homepage template
+- `public/imgs/` — local images (placeholder and logo)
 
-## Technology Stack
+Want more help?
+- I can add: local category images in `public/imgs/`, a small test dataset, or step-by-step video-style README instructions. Tell me which you'd prefer.
 
-### Backend
-- **Node.js** - Runtime environment
-- **Express.js** - Web framework
-- **MongoDB** - Database with Mongoose ODM
-- **Passport.js** - Authentication middleware
-- **BCrypt** - Password hashing
-- **Express Sessions** - Session management
-
-### Frontend
-- **EJS** - Template engine
-- **Tailwind CSS** - Utility-first CSS framework
-- **JavaScript** - Client-side interactivity
-
-### External APIs
-- **FDA Food Recall API** - Real food recall data
-- **Open Food Facts API** - Product information
-- **Cloudinary** - Image storage and CDN
-
-## Installation & Setup
-
-1. Clone the repository:  bash git clone https://github.com/WinnieYuDev/food-guard-mvc-demo
-
-2. Install modules `npm install`
-
----
-
-# Things to add
-
-- Create a `.env` file in config folder and add the following as `key = value`
-  - PORT = 2121 (can be any port example: 3000)
-  - MONGODB_URI = `your database URI`
-  - ClOUNDINARY_CLOUD_NAME = `your cloudinary cloud name`
-  - ClOUNDINARY_API_KEY = `your cloudinary api key`
-  - ClOUNDINARY_API_SECRET = `your cloudinary api secret`
-  - NODE_ENV=development
-
-3. Run using `npm start`
-
-## Examples:
-Feel free to take a look at other fullstack applications I worked on:
-
-Boston Community Trade Swap: https://github.com/WinnieYuDev/community-trade-fullstack
-
-Homecooking Reviews: https://github.com/WinnieYuDev/home-cooking-fullstack
+License & credits
+- This demo is for learning and demo purposes. Images are provided by Unsplash (via direct URLs) or local assets in `public/imgs`.

@@ -1,45 +1,62 @@
 const mongoose = require('mongoose');
 
+// models/Recall.js
+// This file defines the MongoDB schema for a food recall record.
+// Each field below has a type and optional validation rules.
+//  A "schema" is a blueprint for what data each recall must contain.
+// You can add or remove fields here; if you change types, update any code
+// that reads or writes these fields (e.g., controllers and views).
+
 const recallSchema = new mongoose.Schema({
+  // Unique identifier for the recall (comes from the source feed)
   recallId: {
     type: String,
     required: true,
     unique: true
   },
+  // The title is the short headline for the recall (shown on the homepage)
   title: {
     type: String,
     required: true
   },
+  // Full description from the source (may include ingredients, manufacturer details)
   description: {
     type: String,
     required: true
   },
+  // Product name (if available)
   product: {
     type: String,
     required: true
   },
+  // Brand/manufacturer name
   brand: {
     type: String,
     required: true
   },
+  // Reason the product was recalled (e.g. "undeclared egg")
   reason: {
     type: String,
     required: true
   },
+  // The official recall date
   recallDate: {
     type: Date,
     required: true
   },
+  // Issuing agency (FDA, FSIS, USDA)
   agency: {
     type: String,
     enum: ['FDA', 'FSIS', 'USDA'],
     required: true
   },
+  // Risk level helps users quickly assess severity
   riskLevel: {
     type: String,
     enum: ['low', 'medium', 'high', 'critical'],
     required: true
   },
+  // Category is used to pick an image and group recalls visually
   category: {
     type: String,
     enum: [
@@ -60,6 +77,7 @@ const recallSchema = new mongoose.Schema({
     ],
     required: true
   },
+  // Retailer where product was sold (if known)
   retailer: {
     type: String,
     enum: [
@@ -75,21 +93,26 @@ const recallSchema = new mongoose.Schema({
     ],
     required: true
   },
+  // Recall workflow status
   status: {
     type: String,
     enum: ['Ongoing', 'Completed', 'Pending'],
     default: 'Ongoing'
   },
+  // Raw distribution text (e.g. "CT, FL, IL") used when statesAffected is not present
   distribution: {
     type: String,
     required: true
   },
+  // Optional array of affected state codes (easier to render cleanly)
   statesAffected: [{
     type: String
   }],
+  // Optional link to a news article or full recall notice
   articleLink: {
     type: String
   },
+  // Whether the recall is currently active
   isActive: {
     type: Boolean,
     default: true

@@ -1,6 +1,20 @@
 <%- include('partials/header') %>
 
 <main class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    <!--
+        Homepage template variables (provided by controllers/home.js):
+        - `recalls`: array of recall objects. Each recall has display-ready fields:
+            - `cleanedTitle` (string): sanitized, title-cased headline
+            - `cleanedReason` (string): sanitized short reason/summary
+            - `locations` (string): comma-separated affected regions (preferred over agency)
+            - `categoryImage` / `image` (string): URL to display for card image
+        - `posts`: recent community posts
+        - `user`: current logged-in user (optional)
+
+        Use this section to understand what prepared fields the controller provides
+        to the template. These fields are intended for display only and are
+        already formatted by `controllers/home.js`.
+    -->
     
     <div class="bg-gradient-to-r from-usda-blue to-usda-darkblue rounded-xl p-6 mb-8 text-white shadow-lg">
         <div class="flex items-center justify-between">
