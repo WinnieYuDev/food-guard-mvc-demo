@@ -1,3 +1,13 @@
+/**
+ * public/js/main.js
+ *
+ * Lightweight client-side UI helpers used across the site:
+ * - mobile menu toggling
+ * - flash message fading
+ * - simple form validation and like button animation
+ * These functions are intentionally minimal and are intended for
+ * progressive enhancement of EJS-rendered pages.
+ */
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeMobileMenu();

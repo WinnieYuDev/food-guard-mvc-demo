@@ -1,3 +1,12 @@
+/**
+ * middleware/multer.js
+ *
+ * Multer configuration and helper middleware for handling image uploads.
+ * - `upload`: multer middleware that stores files temporarily on disk
+ * - `handleCloudinaryUpload`: uploads the file to Cloudinary and
+ *    attaches `req.cloudinaryResult` with metadata for downstream handlers
+ * - `allowed_formats`: list of accepted image file extensions
+ */
 const multer = require('multer');
 const path = require('path');
 const cloudinary = require('../config/cloudinary');

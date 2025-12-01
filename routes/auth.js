@@ -1,3 +1,10 @@
+/**
+ * routes/auth.js
+ *
+ * Authentication routes for login, signup and logout. Uses express-validator
+ * to validate form input and delegates core auth logic to
+ * `controllers/auth` and Passport configuration in `config/passport`.
+ */
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/auth');

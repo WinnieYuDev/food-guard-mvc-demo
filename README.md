@@ -66,6 +66,18 @@ Project structure (important files)
 - `views/index.ejs` — homepage template
 - `public/imgs/` — local images (placeholder and logo)
 
+Developer Notes — Architecture (short)
+-----------------------------------
+
+- **Routes**: Defined under `routes/` and responsible for HTTP endpoints. Each route file is intentionally thin and delegates to a corresponding controller (for example, `routes/recalls.js` forwards to `controllers/recalls.js`).
+- **Controllers**: Located in `controllers/` and contain request handlers that prepare data for rendering or return JSON. Controllers coordinate models, services, and presentation logic.
+- **Services**: Reusable, single-purpose modules in `services/` (notably `recallAPI.js`) that fetch and normalize data from external providers (FDA/FSIS). Services are kept separate so controllers stay focused on HTTP concerns.
+- **Models**: Mongoose schemas under `models/` represent persisted data (e.g., `Recall`, `Post`, `User`). Normalization runs in controllers/services before saving to the database.
+- **Middleware & Config**: `middleware/` and `config/` contain reusable request middleware (authentication, upload handling) and configuration helpers (Passport, database, Cloudinary).
+- **Views & Public**: EJS templates in `views/` render server-side HTML; `public/` holds static assets and small client-side JS for progressive enhancement.
+
+This short fragment should help developers quickly explain how data flows through the app during demos: services fetch and normalize external data → controllers prepare view-ready fields → views render pages; models persist data and middleware enforces cross-cutting concerns like auth and file uploads.
+
 Want more help?
 - I can add: local category images in `public/imgs/`, a small test dataset, or step-by-step video-style README instructions. Tell me which you'd prefer.
 

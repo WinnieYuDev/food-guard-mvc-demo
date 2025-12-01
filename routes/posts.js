@@ -1,3 +1,10 @@
+/**
+ * routes/posts.js
+ *
+ * Router for community forum post actions (create, view, like, comment).
+ * Routes are protected with authentication middleware where appropriate
+ * and delegate business logic to `controllers/posts`.
+ */
 const express = require('express');
 const router = express.Router();
 const postsController = require('../controllers/posts');

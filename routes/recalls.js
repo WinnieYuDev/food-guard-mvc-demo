@@ -1,3 +1,11 @@
+/**
+ * routes/recalls.js
+ *
+ * Router for recall-related web pages and diagnostic/debug endpoints.
+ * Connects HTTP routes to controller actions in `controllers/recalls`.
+ * Includes JSON API endpoints and lightweight debug helpers used during
+ * development to validate upstream API availability.
+ */
 const express = require('express');
 const router = express.Router();
 const recallsController = require('../controllers/recalls');

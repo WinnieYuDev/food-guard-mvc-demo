@@ -1,3 +1,10 @@
+/**
+ * controllers/posts.js
+ *
+ * Handles forum post CRUD operations: listing posts, viewing a single
+ * post, creating posts (with optional image uploads), liking, commenting
+ * and deleting posts/comments. Uses the `Post` Mongoose model.
+ */
 const Post = require('../models/Post');
 
 module.exports = {

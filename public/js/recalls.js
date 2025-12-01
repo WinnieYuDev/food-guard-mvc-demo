@@ -1,3 +1,11 @@
+/**
+ * public/js/recalls.js
+ *
+ * Client-side behavior for the recalls pages. Implements product lookup
+ * form submission, filtering controls (category/retailer/risk), debounced
+ * search, and dynamically loading the recall news sidebar via the
+ * server-side news endpoint.
+ */
 
 document.addEventListener('DOMContentLoaded', function() {
     const productLookupForm = document.getElementById('productLookupForm');

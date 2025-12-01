@@ -1,3 +1,10 @@
+/**
+ * config/database.js
+ *
+ * MongoDB connection helper. Exports `connectDB()` which connects to the
+ * database using `process.env.MONGODB_URI`. The function logs success or
+ * exits the process on failure to make startup issues clear during dev.
+ */
 const mongoose = require('mongoose');
 
 const connectDB = async () => {

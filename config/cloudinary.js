@@ -1,3 +1,10 @@
+/**
+ * config/cloudinary.js
+ *
+ * Configuration for the Cloudinary client used by server-side upload
+ * handlers. Reads credentials from environment variables and exports
+ * the configured Cloudinary v2 client for reuse across the app.
+ */
 const cloudinary = require('cloudinary').v2;
 
 cloudinary.config({

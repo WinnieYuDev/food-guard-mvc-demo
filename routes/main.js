@@ -1,3 +1,10 @@
+/**
+ * routes/main.js
+ *
+ * Primary site routes for the application (home, about, dashboard shortcuts).
+ * Keeps routing minimal and forwards rendering responsibilities to the
+ * `controllers/home` module where homepage data is prepared.
+ */
 const express = require('express');
 const router = express.Router();
 const homeController = require('../controllers/home');

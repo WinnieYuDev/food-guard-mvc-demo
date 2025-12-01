@@ -1,3 +1,10 @@
+/**
+ * controllers/auth.js
+ *
+ * Controller actions for user authentication: render login/signup pages,
+ * handle signup and login form submissions, and perform logout.
+ * This module uses `User` (Mongoose model) and Passport for authentication.
+ */
 const User = require('../models/User');
 const passport = require('passport');
 

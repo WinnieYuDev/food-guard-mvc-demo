@@ -1,3 +1,10 @@
+/**
+ * config/passport.js
+ *
+ * Passport local strategy configuration. Defines how users are
+ * authenticated (email + password) and how user objects are
+ * serialized/deserialized into the session store.
+ */
 const LocalStrategy = require('passport-local').Strategy;
 const User = require('../models/User');
 
