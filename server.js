@@ -78,8 +78,6 @@ app.use('/', require('./routes/main')); // Homepage and dashboard
 app.use('/auth', require('./routes/auth')); // Login and signup
 app.use('/recalls', require('./routes/recalls')); // Food recalls
 app.use('/posts', require('./routes/posts')); // Forum posts
-// Docs route (serves DATA_FLOW.md when enabled by env)
-app.use('/docs', require('./routes/docs'));
 
 
 app.use((req, res) => {
