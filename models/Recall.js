@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 // models/Recall.js
 // This file defines the MongoDB schema for a food recall record.
 // Each field below has a type and optional validation rules.
-//  A "schema" is a blueprint for what data each recall must contain.
+// A "schema" is a blueprint for what data each recall must contain.
 // You can add or remove fields here; if you change types, update any code
 // that reads or writes these fields (e.g., controllers and views).
 

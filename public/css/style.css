@@ -12,7 +12,7 @@
     left: 0;
     right: 0;
     background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-    color: white;
+    color: rgb(255, 255, 255);
     padding: 1.5rem;
 }
 
@@ -28,18 +28,18 @@
 
 
 .risk-high {
-    background-color: #E52207;
-    color: white;
+    background-color: rgb(229, 34, 7);
+    color: rgb(255, 255, 255);
 }
 
 .risk-medium {
-    background-color: #FFC72C;
-    color: #1B1B1B;
+    background-color: rgb(255, 199, 44);
+    color: rgb(27, 27, 27);
 }
 
 .risk-low {
-    background-color: #00A91C;
-    color: white;
+    background-color: rgb(0, 169, 28);
+    color: rgb(255, 255, 255);
 }
 
 
@@ -53,16 +53,16 @@
 }
 
 ::-webkit-scrollbar-track {
-    background: #f1f1f1;
+    background: rgb(241, 241, 241);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #005EA2;
+    background: rgb(0, 94, 162);
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #1A4480;
+    background: rgb(26, 68, 128);
 }
 
 
@@ -70,7 +70,7 @@ button:focus,
 input:focus, 
 select:focus, 
 textarea:focus {
-    outline: 2px solid #005EA2;
+    outline: 2px solid rgb(0, 94, 162);
     outline-offset: 2px;
 }
 
@@ -108,7 +108,7 @@ textarea:focus {
 .recall-news-item {
     display: block;
     padding: 0.5rem 0 0.75rem 0;
-    border-bottom: 1px solid #e5e7eb; 
+    border-bottom: 1px solid rgb(229, 231, 235); 
     margin-bottom: 0.5rem;
 }
 
@@ -121,7 +121,7 @@ textarea:focus {
 
 .fda-news-link {
     display: block;
-    color: #0b3d91; 
+    color: rgb(11, 61, 145); 
     font-weight: 600;
     text-decoration: none;
 }
@@ -131,13 +131,13 @@ textarea:focus {
 }
 
 .fda-news-meta {
-    color: #6b7280;
+    color: rgb(107, 114, 128);
     font-size: 0.85rem;
     margin-top: 0.25rem;
 }
 
 .fda-news-reason {
-    color: #374151;
+    color: rgb(55, 65, 81);
     font-size: 0.9rem;
     margin-top: 0.25rem;
 }
@@ -165,8 +165,8 @@ textarea:focus {
 }
 
 
-.recall-title { color: #0b3d91; font-weight: 600; }
-.recall-reason { color: #374151; }
+.recall-title { color: rgb(11, 61, 145); font-weight: 600; }
+.recall-reason { color: rgb(55, 65, 81); }
 
 
 .loading {
@@ -176,15 +176,15 @@ textarea:focus {
 
 
 .message-success {
-    background-color: #d4edda;
-    border-color: #c3e6cb;
-    color: #155724;
+    background-color: rgb(212, 237, 218);
+    border-color: rgb(195, 230, 203);
+    color: rgb(21, 87, 36);
 }
 
 .message-error {
-    background-color: #f8d7da;
-    border-color: #f5c6cb;
-    color: #721c24;
+    background-color: rgb(248, 215, 218);
+    border-color: rgb(245, 198, 203);
+    color: rgb(114, 28, 36);
 }
 
 
