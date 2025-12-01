@@ -35,7 +35,7 @@ Simple example: The browser asks `/recalls?category=seafood` → `routes/recalls
 3. The controller saves normalized items to the DB (optional) and then renders the page using EJS templates.
 4. The browser receives ready-to-display HTML with precomputed fields (title, category label, image URL).
 
-## Important small rules (beginner-friendly)
+## Important small rules
 
 - Titles are shown as `Product — Brand` when both are present.
 - The app prefers a valid article URL from the provider. If none exists, it builds a safe FDA search URL.
@@ -50,7 +50,5 @@ Simple example: The browser asks `/recalls?category=seafood` → `routes/recalls
 - `models/Recall.js` — MongoDB schema
 - `views/recalls.ejs` and `public/js/recalls.js` — UI and client code
 
----
-Generated: 2025-12-01 (simplified for beginners)
 
 
