@@ -1,0 +1,59 @@
+<%- include('partials/header') %>
+
+<main class="max-w-6xl mx-auto py-6 px-4">
+    <h1 class="text-2xl font-bold mb-4">Your Profile</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <section class="bg-white rounded-lg p-6 border border-gray-200">
+            <h2 class="text-lg font-semibold mb-3">Pinned Recalls</h2>
+            <% if (pinnedRecalls && pinnedRecalls.length) { %>
+                <ul class="space-y-4">
+                    <% pinnedRecalls.forEach(r => { %>
+                        <li class="flex items-start justify-between">
+                            <div>
+                                <a href="/recalls/<%= r._id %>" class="text-usda-blue font-medium"><%= r.title %></a>
+                                <div class="text-sm text-gray-600 flex items-center space-x-3">
+                                    <span><%= new Date(r.recallDate).toLocaleDateString() %> — <%= r.agency %></span>
+                                    <% if (r && r.isActive === false) { %>
+                                        <span class="text-sm font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded">No longer active</span>
+                                    <% } else if (r && r.status) { %>
+                                        <span class="text-sm text-gray-500">Status: <%= r.status %></span>
+                                    <% } %>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <form action="/recalls/<%= r._id %>/unpin" method="POST" class="inline">
+                                    <button type="submit" class="text-gray-600 hover:text-red-600 p-2 rounded" title="Unpin recall" aria-label="Unpin recall">
+                                        <i class="fa-solid fa-thumbtack"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </li>
+                    <% }) %>
+                </ul>
+            <% } else { %>
+                <p class="text-gray-600">You have not pinned any recalls yet.</p>
+            <% } %>
+        </section>
+
+        <section class="bg-white rounded-lg p-6 border border-gray-200">
+            <h2 class="text-lg font-semibold mb-3">Your Comments</h2>
+            <% if (comments && comments.length) { %>
+                <ul class="space-y-4">
+                    <% comments.forEach(c => { %>
+                        <li>
+                            <a href="/posts/<%= c.postId %>#comment-<%= c.commentId %>" class="text-usda-blue font-medium"><%= c.postTitle %></a>
+                            <div class="text-sm text-gray-600">Posted on <%= new Date(c.createdAt).toLocaleDateString() %></div>
+                            <p class="mt-1 text-gray-700"><%= c.content %></p>
+                        </li>
+                    <% }) %>
+                </ul>
+            <% } else { %>
+                <p class="text-gray-600">You have not commented on any posts yet.</p>
+            <% } %>
+        </section>
+    </div>
+
+</main>
+
+<%- include('partials/footer') %>

@@ -1,299 +1,226 @@
 // controllers/home.js
 // Purpose: prepare data for the homepage (views/index.ejs).
-// This file loads recent posts and active recalls from the database,
-// cleans up recall titles/reasons for nicer display, chooses an image
-// to show for each recall card, and sends the data to the EJS view.
-//
-// - `Recall.find(...).lean()` returns plain JavaScript objects (not Mongoose documents),
-//   which are easier to inspect and modify before passing to templates.
-// - Small helper functions below (sanitizeTitle, selectImageFromText, etc.)
-//   keep the view simple by preparing display-ready fields.
+// Loads recent posts and active recalls (preferring FSIS provider data),
+// sanitizes titles/reasons for UI display, selects category images, and
+// passes the prepared objects to the EJS view.
 
 const Post = require('../models/Post');
 const Recall = require('../models/Recall');
 const recallsController = require('./recalls');
 
-// === Constants: Image maps ===
-// Maps used to select representative images for recall cards. `categoryImageMap`
-// is used when no specific keyword matches are found; `keywordImageMap`
-// contains more specific phrase-based overrides.
-const categoryImageMap = {
-    'poultry': 'https://images.unsplash.com/photo-1587590227264-0ac64ce63ce8?w=800&h=600&fit=crop',
-    'beef': 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=800&h=600&fit=crop',
-    'pork': 'https://images.unsplash.com/photo-1551028136-8e4ee2c1f9c9?w=800&h=600&fit=crop',
-    'seafood': 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=800&h=600&fit=crop',
-    'vegetables': 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=800&h=600&fit=crop',
-    'fruits': 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=800&h=600&fit=crop',
-    'dairy': 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=800&h=600&fit=crop',
-    'eggs': 'https://images.unsplash.com/photo-1518569656558-1f25e69d93d7?w=800&h=600&fit=crop',
-    'nuts': 'https://images.unsplash.com/photo-1608797178974-15b35a64ede9?w=800&h=600&fit=crop',
-    'grains': 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=800&h=600&fit=crop',
-    'snacks': 'https://images.unsplash.com/photo-1578849278619-e73505e9610f?w=800&h=600&fit=crop',
-    'breakfast': 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=800&h=600&fit=crop',
-    'baby-food': 'https://www.foodbusinessnews.net/ext/resources/2020/3/Baby-Food_Lead.webp?height=667&t=1584542595&width=1080',
-    'other': '/imgs/placeholder-food.png' // Local fallback
+// We'll use a small set of local images (placed under `public/imgs/home/`)
+// and match them semantically to recall titles/products/brands when possible.
+// If no semantic match is found we fall back to cycling through the images.
+const localHeroImages = [
+    '/imgs/home/burrito.jpg',
+    '/imgs/home/cauliflower.jpg',
+    '/imgs/home/croquette.jpg',
+    '/imgs/home/jerky.jpg',
+    '/imgs/home/pulledpork.jpg',
+    '/imgs/home/spinach.jpg'
+];
+
+// Map each local image to a set of keywords to match against titles/products/brands.
+const localImageKeywords = {
+    '/imgs/home/burrito.jpg': ['burrito', 'taco', 'wrap'],
+    '/imgs/home/cauliflower.jpg': ['cauliflower', 'cauli'],
+    '/imgs/home/croquette.jpg': ['croquette', 'croquettes'],
+    '/imgs/home/jerky.jpg': ['jerky', 'beef jerky'],
+    '/imgs/home/pulledpork.jpg': ['pulled pork', 'pulledpork', 'pulled', 'barbecue', 'bbq'],
+    '/imgs/home/spinach.jpg': ['spinach']
 };
 
-// Get category image
-const getCategoryImage = (category) => {
-    if (!category) return categoryImageMap.other;
-    const normalizedCategory = category.toLowerCase().trim();
-    return categoryImageMap[normalizedCategory] || categoryImageMap.other;
-};
-
-
-// === Constants: Keyword -> Image overrides ===
-const keywordImageMap = {
-    'scrambled eggs': 'https://images.unsplash.com/photo-1608039829572-78524f79c4c7?w=800&h=600&fit=crop',
-    'scrambled egg': 'https://images.unsplash.com/photo-1608039829572-78524f79c4c7?w=800&h=600&fit=crop',
-    'breakfast burrito': 'https://images.unsplash.com/photo-1574343635105-4cf2ea136b8b?w=800&h=600&fit=crop',
-    'chicken eggs': 'https://images.unsplash.com/photo-1518569656558-1f25e69d93d7?w=800&h=600&fit=crop', // eggs in carton
-    'chicken egg': 'https://images.unsplash.com/photo-1518569656558-1f25e69d93d7?w=800&h=600&fit=crop',
-    
-    crawfish: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?w=800&h=600&fit=crop',
-    fish: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?w=800&h=600&fit=crop',
-    crayfish: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?w=800&h=600&fit=crop',
-    lobster: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?w=800&h=600&fit=crop',
-    
-    scrambled: 'https://images.unsplash.com/photo-1608039829572-78524f79c4c7?w=800&h=600&fit=crop',
-    egg: 'https://images.unsplash.com/photo-1518569656558-1f25e69d93d7?w=800&h=600&fit=crop',
-    eggs: 'https://images.unsplash.com/photo-1518569656558-1f25e69d93d7?w=800&h=600&fit=crop',
-    dairy: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=800&h=600&fit=crop',
-    milk: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=800&h=600&fit=crop',
-    cheese: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=800&h=600&fit=crop',
-    
-    shrimp: 'https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?w=800&h=600&fit=crop',
-    seafood: 'https://images.unsplash.com/photo-1563379926898-05f4575a45d8?w=800&h=600&fit=crop',
-    fish: 'https://images.unsplash.com/photo-1559181567-c3190ca9959b?w=800&h=600&fit=crop',
-    
-    beef: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=800&h=600&fit=crop',
-    pork: 'https://images.unsplash.com/photo-1602470520998-f4a52199a3d6?w=800&h=600&fit=crop',
-    chicken: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=800&h=600&fit=crop',
-    poultry: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=800&h=600&fit=crop',
-    
-    vegetable: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=800&h=600&fit=crop',
-    vegetables: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=800&h=600&fit=crop',
-    fruit: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=800&h=600&fit=crop',
-    fruits: 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=800&h=600&fit=crop',
-    
-    nuts: 'https://images.unsplash.com/photo-1608797178974-15b35a64ede9?w=800&h=600&fit=crop',
-    nut: 'https://images.unsplash.com/photo-1608797178974-15b35a64ede9?w=800&h=600&fit=crop',
-    almonds: 'https://images.unsplash.com/photo-1608797178974-15b35a64ede9?w=800&h=600&fit=crop',
-    
-    noodle: 'https://images.unsplash.com/photo-1473093226795-af9932fe5856?w=800&h=600&fit=crop',
-    noodles: 'https://images.unsplash.com/photo-1473093226795-af9932fe5856?w=800&h=600&fit=crop',
-    pasta: 'https://images.unsplash.com/photo-1473093226795-af9932fe5856?w=800&h=600&fit=crop',
-    grain: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=800&h=600&fit=crop',
-    grains: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=800&h=600&fit=crop',
-    wheat: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=800&h=600&fit=crop',
-    
-    burrito: 'https://images.unsplash.com/photo-1574343635105-4cf2ea136b8b?w=800&h=600&fit=crop',
-    popcorn: 'https://images.unsplash.com/photo-1578849278619-e73505e9610f?w=800&h=600&fit=crop',
-    snack: 'https://images.unsplash.com/photo-1582169296194-e3d8ebf6c4cb?w=800&h=600&fit=crop',
-    snacks: 'https://images.unsplash.com/photo-1582169296194-e3d8ebf6c4cb?w=800&h=600&fit=crop',
-    
-    breakfast: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=800&h=600&fit=crop',
-    bread: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&h=600&fit=crop',
-    
-    baby: 'https://www.foodbusinessnews.net/ext/resources/2020/3/Baby-Food_Lead.webp?height=667&t=1584542595&width=1080'
-};
-
-// Select image based on keywords in text
-const selectImageFromText = (text, fallbackCategory) => {
-    if (!text) return getCategoryImage(fallbackCategory);
-
+const findLocalImageForText = (text) => {
+    if (!text) return null;
     const normalized = text.toLowerCase();
-
-    // Sort keys by length (longer keys first) to prioritize specific matches
-    const sortedKeys = Object.keys(keywordImageMap).sort((a, b) => b.length - a.length);
-
-    for (const key of sortedKeys) {
-        if (normalized.includes(key)) {
-            return keywordImageMap[key];
-        }
+    // Build list of [image,keyword] sorted by keyword length desc so longer phrases match first
+    const candidates = [];
+    for (const img of Object.keys(localImageKeywords)) {
+        for (const kw of localImageKeywords[img]) candidates.push([img, kw]);
     }
-
-    // No keyword matched; use the category-based image
-    return getCategoryImage(fallbackCategory);
+    candidates.sort((a, b) => b[1].length - a[1].length);
+    for (const [img, kw] of candidates) {
+        if (normalized.includes(kw)) return img;
+    }
+    return null;
 };
 
-// Clean product title
-// Removes weight and measurement mentions from text, such as "5 lb", "12 oz",
-// and parenthesized values like "(2 lbs)". This avoids cluttering titles
-// and reasons with irrelevant numeric measurements.
-const toTitleCase = (s) => {
-    if (!s) return s;
-    return s.toLowerCase().replace(/\b(\w)/g, c => c.toUpperCase());
-};
-
-// removeWeightPatterns(s)
-// Removes weight and measurement mentions from text, such as "5 lb", "12 oz",
-// and parenthesized values like "(2 lbs)". This avoids cluttering titles
-// and reasons with irrelevant numeric measurements.
+// Helpers for cleaning strings
 const removeWeightPatterns = (s) => {
     if (!s) return s;
     return s.replace(/\b\d+(?:[\.,]\d+)?\s?(?:lbs?|pounds?|oz|ounces?|kgs?|kg|g)\b/ig, '')
-            .replace(/\(\s*\d+(?:[\.,]\d+)?\s?(?:lbs?|pounds?|oz|ounces?|kgs?|kg|g)\s*\)/ig, '');
+        .replace(/\(\s*\d+(?:[\.,]\d+)?\s?(?:lbs?|pounds?|oz|ounces?|kgs?|kg|g)\s*\)/ig, '');
 };
 
-// dedupeCommaParts(s)
-// Splits a string on common separators and returns a deduplicated, comma-
-// separated string. Useful for cleaning `distribution` fields like
-// "CT, FL, IL, CT" -> "CT, FL, IL".
 const dedupeCommaParts = (s) => {
     if (!s) return s;
     const parts = s.split(/[,/\-]+/).map(p => p.trim()).filter(Boolean);
     const seen = new Set();
     const out = [];
-    for (let p of parts) {
+    for (const p of parts) {
         const key = p.toLowerCase();
-        if (!seen.has(key)) {
-            seen.add(key);
-            out.push(p);
-        }
+        if (!seen.has(key)) { seen.add(key); out.push(p); }
     }
     return out.join(', ');
 };
 
-// removeDuplicateAdjacentWords(s)
-// Removes immediate repeated words, preserving order. Example: "Fresh Fresh Eggs"
-// becomes "Fresh Eggs".
 const removeDuplicateAdjacentWords = (s) => {
     if (!s) return s;
     const words = s.split(/\s+/);
     const out = [];
     let last = null;
     for (const w of words) {
-        if (w.toLowerCase() !== last) {
-            out.push(w);
-            last = w.toLowerCase();
-        }
+        if (w.toLowerCase() !== last) { out.push(w); last = w.toLowerCase(); }
     }
     return out.join(' ');
 };
 
-// sanitizeTitle(title)
-// Runs a series of small cleaning steps to produce a compact, readable title:
-// - remove measurements, collapse extra whitespace
-// - split and dedupe comma/dash parts
-// - remove duplicate adjacent words
-// - trim stray punctuation
 const sanitizeTitle = (title) => {
     if (!title) return title;
     let s = title;
     s = removeWeightPatterns(s);
-    s = s.replace(/\s{2,}/g, ' ');
-    s = s.trim();
+    s = s.replace(/\s{2,}/g, ' ').trim();
     s = dedupeCommaParts(s);
     s = removeDuplicateAdjacentWords(s);
     s = s.replace(/^[,\-:\s]+|[,\-:\s]+$/g, '');
     return s;
 };
 
-// sanitizeReason(reason, title)
-// Cleans the reason field by removing measurements and trimming whitespace.
-// If the reason repeats the title text, this function shortens the reason
-// to avoid duplicate information in the UI (prefers the first sentence).
 const sanitizeReason = (reason, title) => {
     if (!reason) return reason;
     let r = reason;
     r = removeWeightPatterns(r);
     r = r.replace(/\s{2,}/g, ' ').trim();
     if (title && r.toLowerCase().includes(title.toLowerCase())) {
-        const firstSentenceMatch = r.match(/^(.*?\.)\s/);
-        if (firstSentenceMatch) r = firstSentenceMatch[1];
+        const m = r.match(/^(.*?\.)\s/);
+        if (m) r = m[1];
         if (r.length > 140) r = r.slice(0, 137) + '...';
     }
     return r;
 };
 
-// === Controller: Home page ===
-// getHome(req, res)
-// Prepares data for the homepage by loading active recalls and recent
-// posts, normalizing and sanitizing fields for display, and selecting images
-// for each recall card.
+// Main: render homepage
 exports.getHome = async (req, res) => {
     try {
-        
+        const mongoose = require('mongoose');
+        const isDbConnected = mongoose.connection.readyState === 1;
 
         let activeRecalls = [];
         let recentPosts = [];
 
-        const mongoose = require('mongoose');
-        const isDbConnected = mongoose.connection.readyState === 1;
-
         if (isDbConnected) {
             try {
-                activeRecalls = await Recall.find({ isActive: true })
-                    .sort({ recallDate: -1 })
-                    .limit(6)
-                    .lean();
-                // Active recalls loaded
-                activeRecalls = activeRecalls.map(recall => {
-                    const normalizedRecall = recallsController.normalizeRecallData(recall);
-                    
-                    const category = normalizedRecall.category || 'other';
+                // Try FSIS API first (prefer provider titles), filter to 2025, take newest 6
+                const recallApi = require('../services/recallAPI');
+                try {
+                    const fsis = await recallApi.fetchFSISRecalls({ limit: 200, monthsBack: 12 });
+                    const activeFsis = (fsis || []).filter(r => r && r.isActive);
+                    const start2025 = new Date('2025-01-01T00:00:00Z');
+                    const start2026 = new Date('2026-01-01T00:00:00Z');
+                    const filtered = activeFsis.filter(r => {
+                        const d = r.recallDate ? new Date(r.recallDate) : null;
+                        return d && d >= start2025 && d < start2026;
+                    });
+                    filtered.sort((a, b) => new Date(b.recallDate) - new Date(a.recallDate));
+                    const top = filtered.slice(0, 6);
+                    activeRecalls = top.map((r, idx) => {
+                        const normalized = recallsController.normalizeRecallData(r);
+                        const category = normalized.category || (Array.isArray(normalized.categories) && normalized.categories[0]) || 'other';
+                        const cleanedTitle = sanitizeTitle(normalized.title || ((normalized.product && normalized.brand) ? `${normalized.product} - ${normalized.brand}` : (normalized.brand || 'Product Recall')));
+                        const cleanedReason = sanitizeReason(normalized.reason || normalized.description || '', cleanedTitle);
+                        let locations = '';
+                        if (Array.isArray(normalized.statesAffected) && normalized.statesAffected.length) {
+                            locations = [...new Set(normalized.statesAffected.map(s => (s || '').trim()).filter(Boolean))].join(', ');
+                        } else if (normalized.distribution) {
+                            locations = dedupeCommaParts(normalized.distribution);
+                        }
+                        // Try to find a local image semantically matching the title/product/brand
+                        const searchText = `${cleanedTitle} ${normalized.product || ''} ${normalized.brand || ''} ${(Array.isArray(normalized.categories) ? normalized.categories.join(' ') : '')}`;
+                        const matched = findLocalImageForText(searchText);
+                        const chosenImage = matched || localHeroImages[idx % localHeroImages.length] || '/imgs/placeholder-food.png';
+                        // Build `urls` array: prefer normalized.articleLink, then any provider/raw data links
+                        const urls = [];
+                        const pushUrl = (u) => { if (u && typeof u === 'string') { const v = u.trim(); if (v && !urls.includes(v)) urls.push(v); } };
+                        pushUrl(normalized.articleLink);
+                        if (r && r.articleLink) pushUrl(r.articleLink);
+                        if (r && r.rawData) {
+                            const rd = r.rawData;
+                            pushUrl(rd.field_recall_url || rd.RecallUrl || rd.RecallURL || rd.recall_url || rd.recallUrl || rd.URL || rd.url || rd.link);
+                        }
 
-                                        const junkProductPattern = /^\s*$|^[\d\-\/\s,:]+$/;
-                                        let cleanedTitle = '';
-                                        if (normalizedRecall.product && !junkProductPattern.test(normalizedRecall.product) && normalizedRecall.product !== 'Unknown Product') {
-                                            cleanedTitle = (normalizedRecall.product + (normalizedRecall.brand ? ` - ${normalizedRecall.brand}` : '')).trim();
-                                        } else if (normalizedRecall.title && !junkProductPattern.test(normalizedRecall.title) && String(normalizedRecall.title).split(' - ')[0].trim().length > 2) {
-                                            cleanedTitle = normalizedRecall.title;
-                                        } else {
-                                            cleanedTitle = normalizedRecall.brand || normalizedRecall.title || 'Product Recall';
-                                        }
-                    const cleanedReason = sanitizeReason(normalizedRecall.reason || normalizedRecall.description || '', cleanedTitle);
+                        return { ...normalized, cleanedTitle, cleanedReason, locations, categoryImage: chosenImage, image: chosenImage, urls };
+                    });
+                } catch (apiErr) {
+                    // Fallback to DB query
+                    console.warn('FSIS API failed (homepage); falling back to DB:', apiErr && apiErr.message);
+                    const start2025 = new Date('2025-01-01T00:00:00Z');
+                    const start2026 = new Date('2026-01-01T00:00:00Z');
+                    const recalls = await Recall.find({ isActive: true, agency: 'FSIS', recallDate: { $gte: start2025, $lt: start2026 } })
+                        .sort({ recallDate: -1 })
+                        .limit(6)
+                        .lean();
+                    activeRecalls = recalls.map((recall, idx) => {
+                        const normalized = recallsController.normalizeRecallData(recall);
+                        const category = normalized.category || (Array.isArray(normalized.categories) && normalized.categories[0]) || 'other';
+                        const cleanedTitle = sanitizeTitle(normalized.title || ((normalized.product && normalized.brand) ? `${normalized.product} - ${normalized.brand}` : (normalized.brand || 'Product Recall')));
+                        const cleanedReason = sanitizeReason(normalized.reason || normalized.description || '', cleanedTitle);
+                        let locations = '';
+                        if (Array.isArray(normalized.statesAffected) && normalized.statesAffected.length) {
+                            locations = [...new Set(normalized.statesAffected.map(s => (s || '').trim()).filter(Boolean))].join(', ');
+                        } else if (normalized.distribution) {
+                            locations = dedupeCommaParts(normalized.distribution);
+                        }
+                        const searchText = `${cleanedTitle} ${normalized.product || ''} ${normalized.brand || ''} ${(Array.isArray(normalized.categories) ? normalized.categories.join(' ') : '')}`;
+                        const matched = findLocalImageForText(searchText);
+                        const chosenImage = matched || localHeroImages[idx % localHeroImages.length] || '/imgs/placeholder-food.png';
+                        const urls = [];
+                        const pushUrl = (u) => { if (u && typeof u === 'string') { const v = u.trim(); if (v && !urls.includes(v)) urls.push(v); } };
+                        pushUrl(normalized.articleLink);
+                        if (recall && recall.articleLink) pushUrl(recall.articleLink);
+                        if (recall && recall.rawData) {
+                            const rd = recall.rawData;
+                            pushUrl(rd.field_recall_url || rd.RecallUrl || rd.RecallURL || rd.recall_url || rd.recallUrl || rd.URL || rd.url || rd.link);
+                        }
+                        return { ...normalized, cleanedTitle, cleanedReason, locations, categoryImage: chosenImage, image: chosenImage, urls };
+                    });
+                }
 
-                    let locations = '';
-                    if (Array.isArray(normalizedRecall.statesAffected) && normalizedRecall.statesAffected.length > 0) {
-                        const unique = [...new Set(normalizedRecall.statesAffected.map(s => (s || '').trim()).filter(Boolean))];
-                        locations = unique.join(', ');
-                    } else if (normalizedRecall.distribution) {
-                        locations = dedupeCommaParts(normalizedRecall.distribution);
-                    }
-                    // Cleaned title, reason, locations
-                    const combinedText = [cleanedTitle, normalizedRecall.product, normalizedRecall.brand, normalizedRecall.category].filter(Boolean).join(' ');
-                    const chosenImage = selectImageFromText(combinedText, category);
-
-                    return {
-                        ...normalizedRecall,
-                        cleanedTitle,
-                        cleanedReason,
-                        locations: locations,
-                        categoryImage: chosenImage,
-                        image: chosenImage
-                    };
-                });
-                // recent posts loaded
-                recentPosts = await Post.find({ isActive: true })
-                    .populate('author', 'username')
-                    .sort({ createdAt: -1 })
-                    .limit(3)
-                    .lean();
-
-                // Homepage data loaded
-            } catch (dbError) {
-                console.error('Database query failed:', dbError.message);
+                // Load recent posts
+                recentPosts = await Post.find({ isActive: true }).populate('author', 'username').sort({ createdAt: -1 }).limit(3).lean();
+            } catch (dbErr) {
+                console.error('Homepage DB error:', dbErr && dbErr.message);
             }
         } else {
-            console.warn('MongoDB not connected, using empty data');
+            console.warn('MongoDB not connected — homepage will show no recalls');
         }
-        // Render homepage
-        res.render('index', { 
-            title: 'FoodGuard - Home', 
-            recalls: activeRecalls,
-            posts: recentPosts,
-            user: req.user
-        });
 
-    } catch (error) {
-        console.error('Home controller error:', error);
-        res.render('index', {
-            title: 'FoodGuard - Home',
-            recalls: [],
-            posts: [],
-            user: req.user
-        });
+        // Fetch latest FSIS recall for banner (best-effort)
+        let latestAlert = null;
+        try {
+            const recallApi = require('../services/recallAPI');
+            const fsis = await recallApi.fetchFSISRecalls({ limit: 10, monthsBack: 6 });
+            const activeFsis = (fsis || []).filter(r => r && r.isActive);
+            if (activeFsis.length) {
+                activeFsis.sort((a, b) => new Date(b.recallDate) - new Date(a.recallDate));
+                latestAlert = activeFsis[0];
+            }
+        } catch (e) {
+            // ignore
+        }
+
+        res.render('index', { title: 'FoodGuard - Home', recalls: activeRecalls, posts: recentPosts, user: req.user, latestAlert });
+    } catch (err) {
+        console.error('Home controller error:', err && err.message);
+        res.render('index', { title: 'FoodGuard - Home', recalls: [], posts: [], user: req.user });
     }
 };
+
+    // Render a simple visual Food Safety Tips page (4 steps)
+    exports.getTips = (req, res) => {
+        try {
+            res.render('food-safety', { title: 'Food Safety Tips - FoodGuard', user: req.user });
+        } catch (err) {
+            console.error('Error rendering tips page:', err && err.message);
+            res.render('food-safety', { title: 'Food Safety Tips - FoodGuard', user: req.user });
+        }
+    };

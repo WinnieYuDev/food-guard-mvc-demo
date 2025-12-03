@@ -63,13 +63,16 @@ const recallSchema = new mongoose.Schema({
   category: {
     type: String,
     enum: [
-      'poultry', 
-      'vegetables', 
-      'shellfish', 
-      'meat', 
-      'dairy', 
-      'fruits', 
-      'eggs', 
+      'poultry',
+      'beef',
+      'pork',
+      'seafood',
+      'shellfish',
+      'meat',
+      'dairy',
+      'fruits',
+      'eggs',
+      'nuts',
       'grains',
       'processed-foods',
       'beverages',
@@ -80,6 +83,10 @@ const recallSchema = new mongoose.Schema({
     ],
     required: true
   },
+  // categories: allow multiple inferred categories/tags (max 3 in normalization)
+  categories: [{
+    type: String
+  }],
   // Tags: array of short keywords inferred from product/title/description
   tags: [{
     type: String

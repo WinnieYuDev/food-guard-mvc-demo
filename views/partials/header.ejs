@@ -42,6 +42,8 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-usda-gray-50 font-sans">
     
@@ -69,19 +71,20 @@
                         <a href="/about" class="border-transparent text-usda-darkblue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:bg-usda-blue hover:text-white hover:border-usda-darkblue">About</a>
                         <a href="/dashboard" class="border-transparent text-usda-darkblue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:bg-usda-blue hover:text-white hover:border-usda-darkblue">Dashboard</a>
                         <a href="/recalls" class="border-transparent text-usda-darkblue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:bg-usda-blue hover:text-white hover:border-usda-darkblue">Recalls & Products</a>
+                        <a href="/tips" class="border-transparent text-usda-darkblue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:bg-usda-blue hover:text-white hover:border-usda-darkblue">Food Safety Tips</a>
                         <a href="/posts" class="border-transparent text-usda-darkblue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:bg-usda-blue hover:text-white hover:border-usda-darkblue">Community Forum</a>
                     </nav>
                 </div>
                 
                 
-                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-4">
                     <% if (user) { %>
-                        <div class="flex items-center space-x-3 bg-usda-gray-50 px-3 py-2 rounded-lg">
+                        <a href="/me" class="flex items-center space-x-3 bg-usda-gray-50 px-3 py-2 rounded-lg hover:shadow-sm transition-shadow">
                             <div class="w-8 h-8 bg-usda-blue rounded-full flex items-center justify-center">
                                 <span class="text-white text-sm font-medium"><%= user.username.charAt(0).toUpperCase() %></span>
                             </div>
                             <span class="text-sm font-medium text-usda-gray-900">Welcome, <%= user.username %>!</span>
-                        </div>
+                        </a>
                         <a href="/auth/logout" class="text-usda-gray-600 hover:text-usda-red px-3 py-2 rounded-md text-sm font-medium transition-colors border border-transparent hover:border-usda-red">Logout</a>
                     <% } else { %>
                         <a href="/auth/login" class="text-usda-gray-600 hover:text-usda-blue px-3 py-2 rounded-md text-sm font-medium transition-colors">Login</a>

@@ -1,0 +1,97 @@
+<!--
+    views/food-safety.ejs
+
+    A simple, visual 4-step food safety tips page inspired by
+    https://www.foodsafety.gov/keep-food-safe/4-steps-to-food-safety
+    Simplified and optimized for quick scanning.
+-->
+<%- include('partials/header') %>
+
+<main class="min-h-screen bg-gray-50">
+    <section class="bg-gradient-to-br from-usda-blue to-usda-darkblue text-white py-16">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h1 class="text-4xl md:text-5xl font-bold mb-4">4 Simple Food Safety Steps</h1>
+            <p class="text-lg text-blue-100 max-w-2xl mx-auto">Quick, visual guidance to keep food safe at home.</p>
+        </div>
+    </section>
+
+    <main class="min-h-screen bg-gray-50">
+        <section class="py-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+
+            <!-- Clean -->
+            <div class="step-section rounded-lg" aria-labelledby="step-clean">
+                <img src="/imgs/tips/clean.jpg" alt="Clean" class="step-bg" onerror="this.style.display='none'"/>
+                <div class="step-overlay" aria-hidden="true"></div>
+                    <div class="step-content">
+                        <div class="step-text">
+                            <div id="step-clean" class="step-title">Clean — Hands & Surfaces</div>
+                            <div class="step-copy">Wash hands and all food-contact surfaces. Rinse produce under running water.</div>
+                            <div class="step-points" aria-hidden="false">
+                                <div class="step-point"><span class="dot"></span>20s hand wash</div>
+                                <div class="step-point"><span class="dot"></span>Hot soapy counters</div>
+                                <div class="step-point"><span class="dot"></span>Rinse produce</div>
+                            </div>
+                        </div>
+                    </div>
+            </div>
+
+            <!-- Separate -->
+            <div class="step-section rounded-lg" aria-labelledby="step-separate">
+                <img src="/imgs/tips/separate.jpg" alt="Separate" class="step-bg" onerror="this.style.display='none'"/>
+                <div class="step-overlay" aria-hidden="true"></div>
+                <div class="step-content">
+                    <div class="step-text">
+                        <div id="step-separate" class="step-title">Separate — Avoid Cross-Contamination</div>
+                        <div class="step-copy">Keep raw meat, poultry, seafood and eggs apart from ready-to-eat foods while preparing and storing.</div>
+                        <div class="step-points">
+                            <div class="step-point"><span class="dot"></span>Separate boards</div>
+                            <div class="step-point"><span class="dot"></span>Bottom-shelf storage</div>
+                            <div class="step-point"><span class="dot"></span>Clean tools between uses</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cook -->
+            <div class="step-section rounded-lg" aria-labelledby="step-cook">
+                <img src="/imgs/tips/cook.jpg" alt="Cook" class="step-bg" onerror="this.style.display='none'"/>
+                <div class="step-overlay" aria-hidden="true"></div>
+                <div class="step-content">
+                    <div class="step-text">
+                        <div id="step-cook" class="step-title">Cook — Hit Safe Temperatures</div>
+                        <div class="step-copy">Use a thermometer to ensure food reaches temperature that kills germs.</div>
+                        <div class="step-points">
+                            <div class="step-point"><span class="dot"></span>165°F poultry</div>
+                            <div class="step-point"><span class="dot"></span>160°F ground meats</div>
+                            <div class="step-point"><span class="dot"></span>Steaming leftovers</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chill -->
+            <div class="step-section rounded-lg" aria-labelledby="step-chill">
+                <img src="/imgs/tips/chill.jpg" alt="Chill" class="step-bg" onerror="this.style.display='none'"/>
+                <div class="step-overlay" aria-hidden="true"></div>
+                <div class="step-content">
+                    <div class="step-text">
+                        <div id="step-chill" class="step-title">Chill — Refrigerate Promptly</div>
+                        <div class="step-copy">Keep cold foods cold and refrigerate perishables quickly to slow bacterial growth.</div>
+                        <div class="step-points">
+                            <div class="step-point"><span class="dot"></span>Within 2 hours</div>
+                            <div class="step-point"><span class="dot"></span>Fridge ≤ 40°F (4°C)</div>
+                            <div class="step-point"><span class="dot"></span>Thaw safely in fridge</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 text-center text-sm text-gray-600">
+                <p>Official guidance: <a href="https://www.foodsafety.gov/keep-food-safe/4-steps-to-food-safety" class="text-usda-blue font-semibold" target="_blank" rel="noopener noreferrer">foodsafety.gov — 4 Steps</a></p>
+            </div>
+
+        </section>
+
+    </main>
+
+    <%- include('partials/footer') %>

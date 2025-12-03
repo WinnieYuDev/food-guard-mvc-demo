@@ -16,15 +16,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchEl = document.getElementById('search');
     const categoryEl = document.getElementById('category');
     const retailerEl = document.getElementById('retailer');
+    const regionEl = document.getElementById('region');
     const riskEl = document.getElementById('riskLevel');
     const sortOrderEl = document.getElementById('sortOrder');
 
     if (categoryEl) categoryEl.addEventListener('change', handleRecallFilter);
     if (retailerEl) retailerEl.addEventListener('change', handleRecallFilter);
+    if (regionEl) regionEl.addEventListener('change', handleRecallFilter);
     if (riskEl) riskEl.addEventListener('change', handleRecallFilter);
     if (sortOrderEl) sortOrderEl.addEventListener('change', handleRecallFilter);
     if (searchEl) searchEl.addEventListener('input', debounce(handleRecallFilter, 500));
     try { if (typeof loadRecallNews === 'function') loadRecallNews(); } catch (e) { console.warn('loadRecallNews failed to init', e); }
+
+    // (retailer quick-pick removed; use the retailer dropdown filter)
 });
 
 async function handleProductLookup(e) {
@@ -117,31 +121,14 @@ function displayProductResults(data) {
             ${data.hasRecalls ? `
                 <div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
                     <div class="flex items-start">
-                            <div>
-                                <h4 class="font-medium text-red-800 mb-1">Active Recalls Found</h4>
-                                <p class="text-red-700 text-sm">This product has ${data.relatedRecalls.length} active recall(s).</p>
-                                <p class="text-red-700 text-sm mt-1 font-medium">Do not consume and follow recall instructions.</p>
-                            </div>
-                        </div>
-                </div>
-            ` : `
-                <div class="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <div class="flex items-start">
                         <div>
-                            <h4 class="font-medium text-green-800 mb-1">No Active Recalls</h4>
-                            <p class="text-green-700 text-sm">This product has no active recalls at this time.</p>
-                            <p class="text-green-700 text-sm mt-1">Always practice food safety when handling and storing products.</p>
+                            <h4 class="font-medium text-red-800 mb-1">Active Recalls Found</h4>
+                            <p class="text-red-700 text-sm">This product has ${data.relatedRecalls.length} active recall(s).</p>
+                            <p class="text-red-700 text-sm mt-1 font-medium">Do not consume and follow recall instructions.</p>
                         </div>
                     </div>
                 </div>
-            `}
-            
-            
-            <div class="mt-4">
-                <a href="/about" class="inline-flex items-center text-usda-blue hover:text-usda-darkblue font-medium">
-                    About FoodGuard
-                </a>
-            </div>
+            ` : ''}
         </div>
     `;
 }
@@ -150,6 +137,7 @@ function handleRecallFilter() {
     const search = (document.getElementById('search') && document.getElementById('search').value) || '';
     const category = (document.getElementById('category') && document.getElementById('category').value) || 'all';
     const retailer = (document.getElementById('retailer') && document.getElementById('retailer').value) || 'all';
+    const region = (document.getElementById('region') && document.getElementById('region').value) || 'all';
     const riskLevel = (document.getElementById('riskLevel') && document.getElementById('riskLevel').value) || 'all';
     const sortOrder = (document.getElementById('sortOrder') && document.getElementById('sortOrder').value) || 'desc';
 
@@ -157,6 +145,7 @@ function handleRecallFilter() {
     if (search.trim()) params.set('search', search.trim());
     if (category !== 'all') params.set('category', category);
     if (retailer !== 'all') params.set('retailer', retailer);
+    if (region !== 'all') params.set('region', region);
     if (riskLevel !== 'all') params.set('riskLevel', riskLevel);
     if (sortOrder && sortOrder !== 'desc') params.set('sortOrder', sortOrder);
 
@@ -209,7 +198,12 @@ async function loadRecallNews() {
                 if (!isNaN(d.getTime())) date = d.toLocaleDateString();
             }
 
-            let locationText = item.distribution || '';
+            let locationText = '';
+            if (Array.isArray(item.statesAffected) && item.statesAffected.length > 0) {
+                locationText = item.statesAffected.join(', ');
+            } else if (item.distribution) {
+                locationText = item.distribution;
+            }
 
             let reasonText = item.reason || item.description || '';
             const li = document.createElement('li');

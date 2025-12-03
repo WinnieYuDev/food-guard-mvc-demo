@@ -262,6 +262,7 @@ exports.getRecalls = async (req, res) => {
     const search = req.query.search;
     const category = req.query.category;
     const retailer = req.query.retailer; // filter by retailer (from UI)
+    const region = req.query.region; // filter by affected region/state
     const sortBy = req.query.sortBy || 'recallDate';
     const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
 
@@ -273,6 +274,7 @@ exports.getRecalls = async (req, res) => {
       limit: 100,
       monthsBack: 6
     };
+    if (region && region !== 'all') apiFilters.region = region;
     if (category && category !== 'all') {
       apiFilters.category = category;
     }
@@ -332,23 +334,37 @@ exports.getRecalls = async (req, res) => {
           });
         }
 
-        try {
-          apiRecalls.sort((a, b) => {
-            const A = (a[sortBy] === undefined || a[sortBy] === null) ? '' : a[sortBy];
-            const B = (b[sortBy] === undefined || b[sortBy] === null) ? '' : b[sortBy];
-            if (sortBy === 'recallDate') {
-              const ta = new Date(A).getTime();
-              const tb = new Date(B).getTime();
-              return (ta === tb) ? 0 : ((ta < tb) ? -1 * sortOrder : 1 * sortOrder);
-            }
-            if (typeof A === 'string' && typeof B === 'string') {
-              return A.localeCompare(B) * sortOrder;
-            }
-            if (typeof A === 'number' && typeof B === 'number') {
-              return (A - B) * sortOrder;
-            }
-            return (String(A).localeCompare(String(B))) * sortOrder;
+        if (region && region !== 'all') {
+          const r = String(region).toLowerCase();
+          apiRecalls = apiRecalls.filter(rcl => {
+            const states = Array.isArray(rcl.statesAffected) ? rcl.statesAffected.map(s => String(s).toLowerCase()) : [];
+            const distro = (rcl.distribution || '').toString().toLowerCase();
+            return states.includes(r) || distro.includes(r) || (r === 'nationwide' && distro.includes('nationwide'));
           });
+        }
+
+        try {
+          // If sorting by recallDate, ensure a robust chronological sort (newest/oldest)
+          if (sortBy === 'recallDate') {
+            apiRecalls.sort((a, b) => {
+              const ta = new Date(a.recallDate).getTime() || 0;
+              const tb = new Date(b.recallDate).getTime() || 0;
+              // Multiply by sortOrder (1 for asc, -1 for desc)
+              return (ta - tb) * sortOrder;
+            });
+          } else {
+            apiRecalls.sort((a, b) => {
+              const A = (a[sortBy] === undefined || a[sortBy] === null) ? '' : a[sortBy];
+              const B = (b[sortBy] === undefined || b[sortBy] === null) ? '' : b[sortBy];
+              if (typeof A === 'string' && typeof B === 'string') {
+                return A.localeCompare(B) * sortOrder;
+              }
+              if (typeof A === 'number' && typeof B === 'number') {
+                return (A - B) * sortOrder;
+              }
+              return (String(A).localeCompare(String(B))) * sortOrder;
+            });
+          }
         } catch (sortErr) {
           console.warn('Failed to sort API recalls:', sortErr && sortErr.message);
         }
@@ -379,6 +395,8 @@ exports.getRecalls = async (req, res) => {
         if (effectiveCategory) {
           const kws = categoryKeywords[effectiveCategory] || [];
           categoryOr.push({ category: effectiveCategory });
+          // Also match documents that have the category in the `categories` array
+          categoryOr.push({ categories: effectiveCategory });
 
           const keywordOr = [];
           kws.forEach(k => {
@@ -392,6 +410,12 @@ exports.getRecalls = async (req, res) => {
           }
         }
 
+        if (region && region !== 'all') {
+          // Match by statesAffected array or distribution text
+          const regionRegex = new RegExp(region, 'i');
+          if (!dbQuery.$and) dbQuery.$and = [];
+          dbQuery.$and.push({ $or: [ { statesAffected: region }, { distribution: { $regex: regionRegex } } ] });
+        }
         let dbQuery = { ...dbBase };
         if (searchOr.length > 0 && categoryOr.length > 0) {
           dbQuery.$and = [ { $or: searchOr }, { $or: categoryOr } ];
@@ -434,6 +458,7 @@ exports.getRecalls = async (req, res) => {
       if (effectiveCategory) {
         const kws = categoryKeywords[effectiveCategory] || [];
         categoryOr.push({ category: effectiveCategory });
+        categoryOr.push({ categories: effectiveCategory });
 
         const keywordOr = [];
         kws.forEach(k => {
@@ -471,6 +496,18 @@ exports.getRecalls = async (req, res) => {
 
     recalls = recalls.map(recall => exports.normalizeRecallData(recall));
 
+    // Fetch latest FSIS active recall for alert banner (non-blocking)
+    let latestAlert = null;
+    try {
+      const fsis = await recallApiService.fetchFSISRecalls({ limit: 10, monthsBack: 6 });
+      const activeFsis = (fsis || []).filter(r => r.isActive);
+      if (activeFsis.length > 0) {
+        activeFsis.sort((a,b) => new Date(b.recallDate) - new Date(a.recallDate));
+        latestAlert = activeFsis[0];
+      }
+    } catch (err) {
+      // ignore alert fetch errors
+    }
     const totalPages = Math.ceil(total / limit);
 
     const categoryOptions = [
@@ -516,10 +553,23 @@ exports.getRecalls = async (req, res) => {
       { value: 'all', label: 'All Risk Levels' }
     ];
 
+    // Determine user's pinned recall IDs to render pin/unpin controls
+    let pinnedRecallIds = [];
+    try {
+      if (req.user) {
+        const User = require('../models/User');
+        const u = await User.findById(req.user.id).select('pinnedRecalls').lean();
+        pinnedRecallIds = (u && Array.isArray(u.pinnedRecalls)) ? u.pinnedRecalls.map(id => id.toString()) : [];
+      }
+    } catch (pidErr) {
+      console.warn('Failed to load user pinned recalls:', pidErr && pidErr.message);
+    }
+
     res.render('recalls', {
       title: 'Food Recalls & Safety Alerts - FoodGuard',
       recalls,
       user: req.user,
+      pinnedRecallIds,
       pagination: {
         page,
         totalPages,
@@ -537,8 +587,15 @@ exports.getRecalls = async (req, res) => {
       categoryOptions,
       agencyOptions,
       retailerOptions,
+      regionOptions: [
+        { value: 'all', label: 'All Regions' },
+        { value: 'Nationwide', label: 'Nationwide' },
+        { value: 'Multiple States', label: 'Multiple States' },
+        { value: 'AL', label: 'AL' }, { value: 'AK', label: 'AK' }, { value: 'AZ', label: 'AZ' }, { value: 'AR', label: 'AR' }, { value: 'CA', label: 'CA' }, { value: 'CO', label: 'CO' }, { value: 'CT', label: 'CT' }, { value: 'DE', label: 'DE' }, { value: 'FL', label: 'FL' }, { value: 'GA', label: 'GA' }, { value: 'HI', label: 'HI' }, { value: 'ID', label: 'ID' }, { value: 'IL', label: 'IL' }, { value: 'IN', label: 'IN' }, { value: 'IA', label: 'IA' }, { value: 'KS', label: 'KS' }, { value: 'KY', label: 'KY' }, { value: 'LA', label: 'LA' }, { value: 'ME', label: 'ME' }, { value: 'MD', label: 'MD' }, { value: 'MA', label: 'MA' }, { value: 'MI', label: 'MI' }, { value: 'MN', label: 'MN' }, { value: 'MS', label: 'MS' }, { value: 'MO', label: 'MO' }, { value: 'MT', label: 'MT' }, { value: 'NE', label: 'NE' }, { value: 'NV', label: 'NV' }, { value: 'NH', label: 'NH' }, { value: 'NJ', label: 'NJ' }, { value: 'NM', label: 'NM' }, { value: 'NY', label: 'NY' }, { value: 'NC', label: 'NC' }, { value: 'ND', label: 'ND' }, { value: 'OH', label: 'OH' }, { value: 'OK', label: 'OK' }, { value: 'OR', label: 'OR' }, { value: 'PA', label: 'PA' }, { value: 'RI', label: 'RI' }, { value: 'SC', label: 'SC' }, { value: 'SD', label: 'SD' }, { value: 'TN', label: 'TN' }, { value: 'TX', label: 'TX' }, { value: 'UT', label: 'UT' }, { value: 'VT', label: 'VT' }, { value: 'VA', label: 'VA' }, { value: 'WA', label: 'WA' }, { value: 'WV', label: 'WV' }, { value: 'WI', label: 'WI' }, { value: 'WY', label: 'WY' }
+      ],
       riskLevelOptions,
       showLiveData: req.query.live === 'true'
+      , latestAlert
     });
   } catch (error) {
     console.error('Recalls controller error:', error);
@@ -709,6 +766,12 @@ exports.lookupProduct = async (req, res) => {
       productBarcode = offProduct.code || offProduct._id || productBarcode;
       
       productIngredients = offProduct.ingredients_text || offProduct.ingredients_text_with_allergens || productIngredients;
+      // Ensure ingredients are presented in English when possible
+      try {
+        productIngredients = await ensureIngredientsEnglish(productIngredients);
+      } catch (e) {
+        console.warn('Failed ensuring ingredients are English:', e && e.message);
+      }
     } else if (relatedRecalls && relatedRecalls.length > 0) {
       brandName = relatedRecalls[0].brand || 'N/A';
     }
@@ -1043,6 +1106,15 @@ exports.normalizeRecallData = (recall) => {
   // Use a simple hyphen separator and preserve the cleaned text casing.
   let finalTitle = titleParts.length > 0 ? titleParts.join(' - ') : (recall.title || 'Product Recall');
 
+  // Prefer provider-supplied title when available (to match USDA/FSIS exact title)
+  if (recall && recall.rawData) {
+    const rd = recall.rawData;
+    const providerTitle = rd.Title || rd.title || rd.Product || rd.product_name || rd.field_title || recall.title;
+    if (providerTitle && String(providerTitle).trim().length > 0) {
+      finalTitle = String(providerTitle).trim();
+    }
+  }
+
   // Generate simple tags for searches and filtering. Include inferred
   // category and detected food keywords and notable pathogens.
   const tagSet = new Set();
@@ -1069,6 +1141,19 @@ exports.normalizeRecallData = (recall) => {
 
   const tagsArray = Array.from(tagSet);
 
+  // Compute up to 3 categories derived from the product/title text.
+  // Use the shared service helper so logic is consistent with API transforms.
+  let inferredCategories = [];
+  try {
+    const detectText = `${cleanedProduct} ${finalTitle}`.trim();
+    inferredCategories = (recallApiService && typeof recallApiService.determineCategories === 'function')
+      ? recallApiService.determineCategories(detectText, 3)
+      : (recall.categories && Array.isArray(recall.categories) ? recall.categories.slice(0,3) : [ 'other' ]);
+  } catch (e) {
+    inferredCategories = (recall.categories && Array.isArray(recall.categories) ? recall.categories.slice(0,3) : [ 'other' ]);
+  }
+  const finalCategories = Array.from(new Set(inferredCategories.map(c => String(c).toLowerCase()))).slice(0,3);
+
   return {
     _id: recall._id,
     recallId: recall.recallId || recall.recall_number || `RECALL-${Date.now()}`,
@@ -1079,61 +1164,8 @@ exports.normalizeRecallData = (recall) => {
     brand: cleanedBrand,
     reason: recall.reason || recall.reason_for_recall || 'Not specified',
     
-    category: (() => {
-      // Align allowed categories with the Mongoose schema in models/Recall.js
-      const allowed = [
-        'poultry',
-        'vegetables',
-        'shellfish',
-        'meat',
-        'dairy',
-        'fruits',
-        'eggs',
-        'grains',
-        'processed-foods',
-        'beverages',
-        'snacks',
-        'breakfast',
-        'baby-food',
-        'other'
-      ];
-
-      if (isNonFoodItem(cleanedProduct, finalTitle)) {
-        return 'other';
-      }
-
-      const combined = `${cleanedProduct} ${finalTitle}`.toLowerCase();
-
-      let inferred = null;
-
-      if (/\bnoodle\b|\bpasta\b/i.test(combined)) inferred = 'grains';
-
-      if (!inferred && /\bburrito\b|\bbreakfast\ssandwich\b|\bbreakfast\swrap\b|\bsandwich\b|\bwrap\b/i.test(combined)) inferred = 'grains';
-
-      if (!inferred && /\bpopcorn\b|\bsnack\b/i.test(combined)) inferred = 'snacks';
-
-      if (!inferred && /\b(chicken\s+)?eggs?\b|shell\s+eggs?\b|egg\s+product/i.test(combined) && !/burrito|noodle|pasta|sandwich|wrap/i.test(combined)) inferred = 'eggs';
-
-      if (!inferred) {
-        if (/\bmilk\b|\bcheese\b|\byogurt\b|\bdairy\b/i.test(combined)) inferred = 'dairy';
-        else if (/\bchicken\b|\bturkey\b|\bpoultry\b/i.test(combined)) inferred = 'poultry';
-        else if (/\bbeef\b|\bsteak\b/i.test(combined)) inferred = 'meat';
-        else if (/\bpork\b|\bbacon\b|\bsausage\b/i.test(combined)) inferred = 'meat';
-        else if (/\bfish\b|\bshrimp\b|\bseafood\b|\bsalmon\b/i.test(combined)) inferred = 'shellfish';
-        else if (/\bfruit\b|\bapple\b|\borange\b|\bberry\b|\bmelon\b|\bcantaloupe\b|\bhoneydew\b|\bwatermelon\b/i.test(combined)) inferred = 'fruits';
-        else if (/\bvegetable\b|\blettuce\b|\bspinach\b|\bsalad\b|\bonion\b|\bgreen\s+onion\b|\bscallion\b|\bspring\s+onion\b/i.test(combined)) inferred = 'vegetables';
-        else if (/\bbread\b|\bgrain\b/i.test(combined)) inferred = 'grains';
-        else if (/\b(nut|peanut|almond)\b/i.test(combined)) inferred = 'nuts';
-        else if (/\bbaby\b|\binfant\b/i.test(combined)) inferred = 'baby-food';
-      }
-
-      const existing = (recall.category || '').toString().toLowerCase();
-      if (existing && allowed.includes(existing)) return existing;
-
-      if (inferred && allowed.includes(inferred)) return inferred;
-
-      return 'other';
-    })(),
+    category: (finalCategories && finalCategories.length > 0) ? finalCategories[0] : 'other',
+    categories: finalCategories,
     tags: tagsArray,
     riskLevel: recall.riskLevel || 'medium',
     retailer: retailerSlug,
@@ -1146,7 +1178,7 @@ exports.normalizeRecallData = (recall) => {
       if (s === 'pending') return 'Pending';
       return 'Ongoing';
     })(),
-    source: recall.source || 'database',
+    // Do not expose a `source` property in normalized objects (avoid 'database' labels in UI)
     
     distribution: recall.distribution || recall.distribution_pattern || 'Nationwide',
     statesAffected: Array.isArray(recall.statesAffected) ? recall.statesAffected : 
@@ -1234,6 +1266,7 @@ exports.reNormalizeAllRecalls = async () => {
             description: normalized.description,
             reason: normalized.reason,
             category: normalized.category,
+            categories: normalized.categories || [normalized.category],
             tags: normalized.tags || []
           }}
         );
@@ -1262,13 +1295,92 @@ exports.reNormalizeAllRecalls = async () => {
 exports.getNews = async (req, res) => {
   try {
     const recallApi = require('../services/recallAPI');
-    const fdaRecalls = await recallApi.fetchFDARecalls({ limit: 20, monthsBack: 12 });
+    // Use FSIS active recalls only for the news sidebar
+    const fsisRecalls = await recallApi.fetchFSISRecalls({ limit: 200, monthsBack: 12 });
+    const active = (Array.isArray(fsisRecalls) ? fsisRecalls : []).filter(r => r.isActive);
 
-    const normalized = (Array.isArray(fdaRecalls) ? fdaRecalls : []).map(r => exports.normalizeRecallData(r));
+    // Normalize and sort strictly by publish/recall date (newest first)
+    const normalized = active.map(r => exports.normalizeRecallData(r));
+    normalized.sort((a,b) => new Date(b.recallDate).getTime() - new Date(a.recallDate).getTime());
 
     return res.json({ success: true, results: normalized });
   } catch (error) {
     console.error('Error fetching news (server proxy):', error.message);
     return res.status(500).json({ success: false, error: 'Failed to fetch recall news' });
   }
+};
+
+// Attempt to ensure ingredient text is English.
+// If a translation service endpoint is configured via `TRANSLATE_API_URL`, we'll POST { q, target: 'en' }
+// and expect either { translatedText } or { translations: [{ translatedText }] } in the response.
+// Otherwise, fall back to a small French->English phrase mapping for common grocery terms.
+const looksNonEnglish = (text) => {
+  if (!text || typeof text !== 'string') return false;
+  // quick heuristics: accented characters or common French words
+  const hasAccents = /[éèêàçôùïüœÉÈÊÀÇÔÙÏÜŒ]/.test(text);
+  const frenchWords = /\b(le|la|les|de|des|et|huile|sucre|lait|noisette|noisettes|sans\s+gluten|émulsifiants|vanilline|cacao|poudre)\b/i;
+  return hasAccents || frenchWords.test(text);
+};
+
+const basicFrenchToEnglish = (text) => {
+  if (!text || typeof text !== 'string') return text;
+  let t = text;
+  const map = [
+    [/\b[Ss]ucre\b/g, 'sugar'],
+    [/huile\s+de\s+palme/gi, 'palm oil'],
+    [/\bNOISETTES\b/gi, 'hazelnuts'],
+    [/noisette(s)?/gi, 'hazelnut$1'],
+    [/\bLAIT\b/gi, 'milk'],
+    [/écrémé/gi, 'skimmed'],
+    [/en\s+poudre/gi, 'powder'],
+    [/cacao\s+maigre/gi, 'cocoa (low-fat)'],
+    [/cacao/gi, 'cocoa'],
+    [/émulsifiants/gi, 'emulsifiers'],
+    [/lécithines/gi, 'lecithins'],
+    [/\[SOJA\]/gi, '[SOY]'],
+    [/soja/gi, 'soy'],
+    [/vanilline/gi, 'vanillin'],
+    [/sans\s+gluten/gi, 'gluten-free'],
+    [/\bNOISETTES\b/gi, 'hazelnuts'],
+    [/\b%/g, '%'],
+    [/\s+;/g, '; ']
+  ];
+
+  for (const [re, rep] of map) {
+    t = t.replace(re, rep);
+  }
+
+  // Normalize spacing and remove duplicate whitespace
+  t = t.replace(/\s+/g, ' ').trim();
+  // Capitalize first letter
+  t = t.charAt(0).toUpperCase() + t.slice(1);
+  return t;
+};
+
+const ensureIngredientsEnglish = async (text) => {
+  if (!text || typeof text !== 'string') return text;
+  if (!looksNonEnglish(text)) return text;
+
+  // If a translation endpoint is configured, attempt translation first
+  const apiUrl = process.env.TRANSLATE_API_URL;
+  const apiKey = process.env.TRANSLATE_API_KEY || process.env.TRANSLATE_API_KEY_BEARER;
+  if (apiUrl) {
+    try {
+      const payload = { q: text, target: 'en' };
+      const headers = { 'Content-Type': 'application/json' };
+      if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+      const resp = await axios.post(apiUrl, payload, { headers, timeout: 8000, httpsAgent: new https.Agent({ rejectUnauthorized: false }) });
+      if (resp && resp.data) {
+        if (typeof resp.data === 'string') return resp.data;
+        if (resp.data.translatedText) return resp.data.translatedText;
+        if (Array.isArray(resp.data.translations) && resp.data.translations[0] && resp.data.translations[0].translatedText) return resp.data.translations[0].translatedText;
+        if (resp.data.data && resp.data.data.translations && resp.data.data.translations[0] && resp.data.data.translations[0].translatedText) return resp.data.data.translations[0].translatedText;
+      }
+    } catch (err) {
+      console.warn('Ingredient translation failed, falling back to basic mapping:', err && err.message);
+    }
+  }
+
+  // Fallback: basic mapping for common French grocery terms
+  return basicFrenchToEnglish(text);
 };

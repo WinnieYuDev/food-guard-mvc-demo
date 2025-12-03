@@ -25,6 +25,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null // Optional profile picture
   },
+  // Pinned recalls saved by the user for quick access
+  pinnedRecalls: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Recall'
+  }],
   isActive: {
     type: Boolean,
     default: true // User account is active

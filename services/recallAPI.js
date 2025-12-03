@@ -77,17 +77,10 @@ class RecallApiService {
    */
   async searchRecalls(searchTerm, limit = 20) {
     try {
+      // Use FSIS only for searches while FDA data is disabled
       const filters = { search: searchTerm, limit, monthsBack: 12 };
-      const [fdaRes, fsisRes] = await Promise.allSettled([
-        this.fetchFDARecalls(filters),
-        this.fetchFSISRecalls(filters)
-      ]);
-
-      let results = [];
-      if (fdaRes.status === 'fulfilled') results.push(...fdaRes.value);
-      if (fsisRes.status === 'fulfilled') results.push(...fsisRes.value);
-
-      results = results.sort((a, b) => new Date(b.recallDate) - new Date(a.recallDate)).slice(0, limit);
+      const fsisRes = await this.fetchFSISRecalls(filters);
+      const results = (fsisRes || []).sort((a, b) => new Date(b.recallDate) - new Date(a.recallDate)).slice(0, limit);
       return results;
     } catch (error) {
       console.error('searchRecalls error:', error.message);
@@ -151,25 +144,10 @@ class RecallApiService {
    */
   async fetchAllRecalls(filters = {}) {
     try {
-      const [fdaRecalls, fsisRecalls] = await Promise.allSettled([
-        this.fetchFDARecalls(filters),
-        this.fetchFSISRecalls(filters)
-      ]);
+      // Use FSIS only for aggregated recall fetches; exclude FDA for now
+      const fsisRecalls = await this.fetchFSISRecalls(filters);
+      const recalls = (fsisRecalls && fsisRecalls.length > 0) ? fsisRecalls : this.getMockRecalls(filters);
 
-      const recalls = [];
-
-      if (fdaRecalls.status === 'fulfilled') {
-        recalls.push(...fdaRecalls.value);
-      }
-
-      if (fsisRecalls.status === 'fulfilled') {
-        recalls.push(...fsisRecalls.value);
-      }
-
-      if (recalls.length === 0) {
-        return this.getMockRecalls(filters);
-      }
-      
       return recalls
         .sort((a, b) => new Date(b.recallDate) - new Date(a.recallDate))
         .slice(0, filters.limit || 50);
@@ -210,6 +188,7 @@ class RecallApiService {
       const recallDate = recall.recall_initiation_date || recall.report_date || new Date().toISOString();
       const company = recall.recalling_firm || recall.firm_name || 'Unknown Company';
       
+      const categories = this.determineCategories(productName);
       return {
         recallId: recall.recall_number || `FDA-${recall.id || Date.now()}`,
         title: productName,
@@ -220,15 +199,48 @@ class RecallApiService {
         recallDate: recallDate,
         agency: 'FDA',
         riskLevel: this.determineRiskLevel(reason),
-        category: this.determineCategory(productName),
+        category: categories[0] || 'other',
+        categories: categories,
         status: recall.status || recall.recall_status || 'Ongoing',
         distribution: recall.distribution_pattern || 'Nationwide',
         statesAffected: this.extractStates(recall.distribution_pattern),
-        source: 'FDA',
         isActive: !recall.termination_date, // Consider active if no termination date
         rawData: recall // Keep original data for reference
       };
     });
+  }
+
+  // Determine multiple categories (up to maxCount) from product description
+  determineCategories(productDescription, maxCount = 3) {
+    if (!productDescription) return ['other'];
+    const descLower = String(productDescription).toLowerCase();
+    const pushIf = (arr, val) => { if (!arr.includes(val)) arr.push(val); };
+    const out = [];
+
+    const lists = [
+      { cat: 'seafood', kws: ['imitation crab','crabmeat','krab','crab','shrimp','prawn','lobster','oyster','mussel','scallop','clam','fish','salmon','tuna','cod','pollock'] },
+      { cat: 'poultry', kws: ['chicken','turkey','poultry','hen','duck','quail'] },
+      { cat: 'beef', kws: ['beef','steak','burger','ground beef','hamburger'] },
+      { cat: 'pork', kws: ['pork','bacon','sausage','ham'] },
+      { cat: 'dairy', kws: ['milk','cheese','yogurt','dairy','ice cream','cream','butter'] },
+      { cat: 'eggs', kws: ['egg','eggs','egg product'] },
+      { cat: 'nuts', kws: ['nut','peanut','almond','cashew','pistachio','walnut','hazelnut','macadamia','pecan'] },
+      { cat: 'grains', kws: ['burrito','wrap','sandwich','noodle','pasta','ramen','bread','flour','tortilla','bagel','bun','muffin','croissant','cereal','rice','cracker'] },
+      { cat: 'snacks', kws: ['cookie','biscuit','candy','chocolate','snack','chip','cracker','bar','granola','pretzel','popcorn','jerky'] },
+      { cat: 'vegetables', kws: ['spinach','lettuce','broccoli','vegetable','carrot','tomato','onion','pepper','cabbage'] },
+      { cat: 'fruits', kws: ['apple','berry','orange','melon','banana','grape','mango','peach','pear','pineapple'] },
+      { cat: 'baby-food', kws: ['baby','infant'] }
+    ];
+
+    for (const entry of lists) {
+      for (const k of entry.kws) {
+        if (descLower.includes(k)) { pushIf(out, entry.cat); break; }
+      }
+      if (out.length >= maxCount) break;
+    }
+
+    if (out.length === 0) out.push('other');
+    return out.slice(0, maxCount);
   }
 
   transformFSISData(fsisData) {
@@ -245,8 +257,23 @@ class RecallApiService {
         const plain = conciseProduct.replace(/<[^>]*>/g, '').trim();
         conciseProduct = plain.split(/[\.\n]/)[0];
       }
+      const rawDistribution = recall.Distribution || recall.distribution || recall.field_distro_list || recall.field_states || '';
 
-      const distribution = recall.Distribution || recall.distribution || recall.field_distro_list || recall.field_states || 'Nationwide';
+      // Normalize distribution -> statesAffected and a clean distribution string
+      const derivedStates = this.extractStates(rawDistribution || recall.field_states || recall.field_distro_list);
+      let distributionStr = 'Nationwide';
+      if (Array.isArray(derivedStates) && derivedStates.length > 0) {
+        if (derivedStates.length === 1 && (derivedStates[0] === 'Nationwide' || derivedStates[0] === 'Multiple States')) {
+          distributionStr = derivedStates[0];
+        } else {
+          distributionStr = derivedStates.join(', ');
+        }
+      } else if (rawDistribution && String(rawDistribution).trim().length > 0) {
+        distributionStr = String(rawDistribution).replace(/\b\S+\.(pdf|docx?|xls|xlsx)\b/gi, '').replace(/https?:\/\/[\S]+/gi, '').trim();
+        if (!distributionStr) distributionStr = 'Multiple States';
+      }
+
+      const categories = this.determineCategories(conciseProduct);
 
       return {
         recallId: recallNumber,
@@ -256,13 +283,15 @@ class RecallApiService {
         brand: company,
         reason: reason,
         recallDate: this.parseFSISDate(recallDateRaw),
+        // prefer a provider-supplied URL field when available
+        articleLink: recall.field_recall_url || recall.RecallUrl || recall.RecallURL || recall.recall_url || recall.recallUrl || recall.URL || null,
         agency: 'FSIS',
         riskLevel: this.determineRiskLevel(reason),
-        category: this.determineCategory(conciseProduct),
+        category: categories[0] || 'other',
+        categories: categories,
         status: recall.Status || recall.status || recall.field_recall_type || 'Ongoing',
-        distribution: distribution,
-        statesAffected: this.extractStates(distribution || recall.field_states),
-        source: 'FSIS',
+        distribution: distributionStr,
+        statesAffected: Array.isArray(derivedStates) && derivedStates.length > 0 ? derivedStates : ['Multiple States'],
         isActive: ((recall.Status || recall.field_active_notice || '') + '').toString().toLowerCase() !== 'false' && ((recall.Status || '') + '').toString().toLowerCase() !== 'completed',
         rawData: recall // Keep original data for reference
       };
@@ -271,32 +300,41 @@ class RecallApiService {
 
   extractStates(distributionPattern) {
     if (!distributionPattern) return ['Nationwide'];
-    
+
+    // Accept arrays (already parsed) or strings
+    if (Array.isArray(distributionPattern)) {
+      const arr = distributionPattern.map(s => String(s).trim()).filter(Boolean);
+      if (arr.length === 0) return ['Nationwide'];
+      const twoLetter = arr.filter(a => /^[A-Za-z]{2}$/.test(a));
+      if (twoLetter.length > 0) return twoLetter.map(s => s.toUpperCase());
+      return [arr.join(', ')];
+    }
+
     const pattern = String(distributionPattern).toLowerCase();
-    
+
     if (pattern.includes('nationwide') || pattern.includes('national') || pattern.includes('nation wide')) {
       return ['Nationwide'];
     }
-    
+
     if (pattern.includes('multi-state') || pattern.includes('multiple states')) {
       return ['Multiple States'];
     }
-    
+
     const stateAbbreviations = [
       'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
       'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
       'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
       'VA','WA','WV','WI','WY'
     ];
-    
+
     const foundStates = stateAbbreviations.filter(state => 
-      new RegExp(`\\b${state}\\b`, 'i').test(distributionPattern)
+      new RegExp(`\b${state}\b`, 'i').test(distributionPattern)
     );
-    
+
     if (foundStates.length > 0) {
       return foundStates;
     }
-    
+
     return ['Multiple States'];
   }
 

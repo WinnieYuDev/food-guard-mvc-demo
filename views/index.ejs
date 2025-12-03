@@ -8,6 +8,16 @@
 <%- include('partials/header') %>
 
 <main class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    <% if (typeof latestAlert !== 'undefined' && latestAlert && latestAlert.title) { %>
+        <div class="mb-6 px-3 py-2 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 rounded">
+            <marquee behavior="scroll" direction="left" scrollamount="4">
+                <strong>Latest Alert:</strong>
+                <a href="<%= latestAlert.articleLink || (latestAlert.rawData && latestAlert.rawData.field_recall_url) || '#' %>" target="_blank" rel="noopener noreferrer" class="underline">
+                    <%= latestAlert.title %>
+                </a>
+            </marquee>
+        </div>
+    <% } %>
     <!--
         Homepage template variables (provided by controllers/home.js):
         - `recalls`: array of recall objects. Each recall has display-ready fields:
@@ -62,10 +72,15 @@
                 <% recalls.forEach(recall => { %>
                     <div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all duration-300 border border-usda-gray-200">
                         <div class="relative">
-                            
-                            <img src="<%= recall.categoryImage || recall.image || '/imgs/placeholder-food.png' %>" 
-                                 alt="<%= recall.cleanedTitle || recall.title || 'Food Recall' %>" 
-                                 class="w-full h-48 object-cover">
+                            <% const primaryUrl = (recall.urls && recall.urls.length > 0) ? recall.urls[0] : (recall.articleLink || ''); %>
+                            <% if (primaryUrl) { %>
+                                <a href="<%= primaryUrl %>" target="_blank" rel="noopener noreferrer" class="block">
+                            <% } %>
+                               <img src="<%= recall.categoryImage || recall.image || '/imgs/placeholder-food.png' %>" 
+                                   alt="<%= recall.cleanedTitle || recall.title || 'Food Recall' %>" 
+                                   class="w-full h-48 object-cover"
+                                   loading="lazy"
+                                   onerror="this.onerror=null;this.src='/imgs/placeholder-food.png';">
                             
                             
                             <div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end">
@@ -73,6 +88,9 @@
                                     <h3 class="font-bold text-lg leading-tight"><%= recall.cleanedTitle || recall.title %></h3>
                                 </div>
                             </div>
+                            <% if (primaryUrl) { %>
+                                </a>
+                            <% } %>
                             
                             
                             <div class="absolute top-3 right-3">
