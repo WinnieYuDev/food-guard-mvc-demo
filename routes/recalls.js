@@ -22,5 +22,7 @@ router.get('/api/recalls', recallsController.apiGetRecalls);
 // Pin/unpin recalls (requires auth)
 router.post('/:id/pin', isLoggedIn, userController.pinRecall);
 router.post('/:id/unpin', isLoggedIn, userController.unpinRecall);
+// Pin by provider recallId (create/upsert then pin)
+router.post('/pin-by/:recallId', isLoggedIn, userController.pinRecallByRecallId);
 
 module.exports = router;

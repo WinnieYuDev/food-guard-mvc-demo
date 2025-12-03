@@ -18,21 +18,7 @@
             </marquee>
         </div>
     <% } %>
-    <!--
-        Homepage template variables (provided by controllers/home.js):
-        - `recalls`: array of recall objects. Each recall has display-ready fields:
-            - `cleanedTitle` (string): sanitized, title-cased headline
-            - `cleanedReason` (string): sanitized short reason/summary
-            - `locations` (string): comma-separated affected regions (preferred over agency)
-            - `categoryImage` / `image` (string): URL to display for card image
-        - `posts`: recent community posts
-        - `user`: current logged-in user (optional)
-
-        Use this section to understand what prepared fields the controller provides
-        to the template. These fields are intended for display only and are
-        already formatted by `controllers/home.js`.
-    -->
-    
+    <!-- Banner Section -->
     <div class="bg-gradient-to-r from-usda-blue to-usda-darkblue rounded-xl p-6 mb-8 text-white shadow-lg">
         <div class="flex items-center justify-between">
             <div>
@@ -51,8 +37,7 @@
             </div>
         </div>
     </div>
-
-    
+    <!-- Active Recalls Section -->
     <section class="mb-12">
         <div class="flex items-center justify-between mb-6">
             <h2 class="text-2xl font-bold text-usda-gray-900 flex items-center">
@@ -66,7 +51,7 @@
                 </svg>
             </a>
         </div>
-        
+        <!-- Active Recalls List -->
         <% if (recalls.length > 0) { %>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <% recalls.forEach(recall => { %>
@@ -112,8 +97,7 @@
                                 </span>
                             </div>
                         </div>
-                        
-                        
+                        <!-- Recall Details -->
                         <div class="p-4">
                             <p class="text-usda-gray-600 text-sm mb-3 line-clamp-2">
                                 <%= recall.cleanedReason || recall.reason || recall.description || 'No detailed description available.' %>
@@ -154,6 +138,66 @@
         <% } %>
     </section>
 
+    <!-- Your Pinned Recalls -->
+    <% if (user) { %>
+        <section class="mt-10">
+            <h2 class="text-2xl font-bold text-usda-gray-900 mb-6">Your Pinned Recalls</h2>
+
+            <% if (pinnedRecalls && pinnedRecalls.length > 0) { %>
+                <div class="bg-white rounded-xl shadow-sm divide-y divide-usda-gray-200 border border-usda-gray-200">
+                    <% pinnedRecalls.forEach(p => { %>
+                        <div class="p-6 hover:bg-usda-gray-50 transition-colors flex items-center justify-between">
+                            <div class="mr-4 flex-1">
+                                <div class="flex items-center mb-1 space-x-3">
+                                    <% if (p.isActive === false) { %>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600">Inactive</span>
+                                    <% } else { %>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-600">Active</span>
+                                    <% } %>
+                                    <h3 class="text-lg font-semibold text-usda-gray-900">
+                                        <% if (p.articleLink) { %>
+                                            <a href="<%= p.articleLink %>" target="_blank" rel="noopener noreferrer"><%= p.title %></a>
+                                        <% } else { %>
+                                            <a href="/recalls/<%= p._id %>"><%= p.title %></a>
+                                        <% } %>
+                                    </h3>
+                                </div>
+                                <p class="text-usda-gray-600 mb-2 line-clamp-2"><%= p.description || p.reason || '' %></p>
+                                <div class="text-xs text-usda-gray-500"><%= p.recallDate ? new Date(p.recallDate).toLocaleDateString() : 'Date unknown' %></div>
+                            </div>
+
+                            <div class="ml-4 flex items-start">
+                                <form action="/recalls/<%= p._id %>/unpin" method="POST">
+                                    <button type="submit" class="text-gray-600 hover:text-red-600 p-2 rounded" title="Unpin">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+                <div class="mt-6 text-center">
+                    <a href="/me" class="inline-flex items-center text-usda-blue hover:text-usda-darkblue font-semibold">Manage pinned
+                        <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                        </svg>
+                    </a>
+                </div>
+            <% } else { %>
+                <div class="bg-white rounded-xl shadow-sm p-8 text-center border border-usda-gray-200">
+                    <div class="w-16 h-16 bg-usda-blue rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h6m5 2v5l-5-3H7a2 2 0 01-2-2V7a2 2 0 012-2h10a2 2 0 012 2v7z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-usda-gray-900 mb-2">No pinned recalls</h3>
+                    <p class="text-usda-gray-600 mb-4">Pin important recalls to keep them handy and monitor status changes.</p>
+                    <a href="/recalls" class="inline-flex items-center bg-usda-blue hover:bg-usda-darkblue text-white px-4 py-2 rounded-lg font-medium transition-colors">Browse Recalls</a>
+                </div>
+            <% } %>
+        </section>
+    <% } %>
+
     
     <section>
         <h2 class="text-2xl font-bold text-usda-gray-900 mb-6">Recent Community Discussions</h2>
@@ -176,9 +220,7 @@
                                 badgeText = 'safety tips';
                             }
                             %>
-                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium <%= badgeClass %>">
-                                <%= badgeText %>
-                            </span>
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium <%= badgeClass %>"><%= badgeText %></span>
                         </div>
                         <p class="text-usda-gray-600 mb-4 line-clamp-2"><%= post.content %></p>
                         <div class="flex items-center justify-between text-sm text-usda-gray-500">

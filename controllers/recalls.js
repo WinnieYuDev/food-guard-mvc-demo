@@ -186,6 +186,46 @@ const cleanProductTitle = (title) => {
   return cleaned || 'Unknown Product';
 };
 
+// Build a MongoDB query object from common filter parameters.
+// Centralizing this avoids duplicated logic and keeps filtering consistent.
+function buildDbQuery({ search, category, retailer, region, riskLevel, agency, includeActive = true }) {
+  const dbQuery = {};
+  if (includeActive) dbQuery.isActive = true;
+
+  // Search across common text fields
+  if (search && String(search).trim().length > 0) {
+    const s = String(search).trim();
+    dbQuery.$or = [
+      { title: { $regex: s, $options: 'i' } },
+      { product: { $regex: s, $options: 'i' } },
+      { brand: { $regex: s, $options: 'i' } },
+      { description: { $regex: s, $options: 'i' } }
+    ];
+  }
+
+  // Category: match category field or categories array; also fall back to text match
+  if (category && category !== 'all') {
+    dbQuery.$or = dbQuery.$or || [];
+    dbQuery.$or.push({ category: category });
+    dbQuery.$or.push({ categories: category });
+    // Also match textually in title/product/description to catch uncategorized items
+    dbQuery.$or.push({ title: { $regex: category, $options: 'i' } });
+    dbQuery.$or.push({ product: { $regex: category, $options: 'i' } });
+  }
+
+  if (retailer && retailer !== 'all') dbQuery.retailer = retailer;
+  if (region && region !== 'all') {
+    // Match by statesAffected array or distribution text
+    const regionRegex = new RegExp(region, 'i');
+    dbQuery.$and = dbQuery.$and || [];
+    dbQuery.$and.push({ $or: [ { statesAffected: region }, { distribution: { $regex: regionRegex } } ] });
+  }
+  if (riskLevel && riskLevel !== 'all') dbQuery.riskLevel = riskLevel;
+  if (agency && agency !== 'all') dbQuery.agency = agency;
+
+  return dbQuery;
+}
+
 const isNonFoodItem = (productText, titleText) => {
   const combined = `${productText || ''} ${titleText || ''}`.toLowerCase();
   
@@ -377,56 +417,8 @@ exports.getRecalls = async (req, res) => {
       } else {
       
 
-        const dbBase = { isActive: true };
-
-        const searchOr = [];
-        if (search) {
-          searchOr.push(
-            { title: { $regex: search, $options: 'i' } },
-            { product: { $regex: search, $options: 'i' } },
-            { brand: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } }
-          );
-        }
-
-        let categoryOr = [];
-        const effectiveCategory = category && category !== 'all' ? category : null;
-
-        if (effectiveCategory) {
-          const kws = categoryKeywords[effectiveCategory] || [];
-          categoryOr.push({ category: effectiveCategory });
-          // Also match documents that have the category in the `categories` array
-          categoryOr.push({ categories: effectiveCategory });
-
-          const keywordOr = [];
-          kws.forEach(k => {
-            keywordOr.push({ title: { $regex: k, $options: 'i' } });
-            keywordOr.push({ product: { $regex: k, $options: 'i' } });
-            keywordOr.push({ description: { $regex: k, $options: 'i' } });
-          });
-
-          if (keywordOr.length > 0) {
-            categoryOr.push({ $or: keywordOr });
-          }
-        }
-
-        if (region && region !== 'all') {
-          // Match by statesAffected array or distribution text
-          const regionRegex = new RegExp(region, 'i');
-          if (!dbQuery.$and) dbQuery.$and = [];
-          dbQuery.$and.push({ $or: [ { statesAffected: region }, { distribution: { $regex: regionRegex } } ] });
-        }
-        let dbQuery = { ...dbBase };
-        if (searchOr.length > 0 && categoryOr.length > 0) {
-          dbQuery.$and = [ { $or: searchOr }, { $or: categoryOr } ];
-        } else if (searchOr.length > 0) {
-          dbQuery.$or = searchOr;
-        } else if (categoryOr.length > 0) {
-          dbQuery.$or = categoryOr;
-        }
-
-        if (retailer && retailer !== 'all') dbQuery.retailer = retailer;
-        if (riskLevel && riskLevel !== 'all') dbQuery.riskLevel = riskLevel;
+        // Build DB query using centralized helper
+        const dbQuery = buildDbQuery({ search, category, retailer, region, riskLevel });
 
         const dbResults = await Recall.find(dbQuery)
           .sort({ [sortBy]: sortOrder })
@@ -440,49 +432,8 @@ exports.getRecalls = async (req, res) => {
     } catch (apiError) {
       console.error('API fetch error:', apiError.message);
 
-      const dbBase = { isActive: true };
-
-      const searchOr = [];
-      if (search) {
-        searchOr.push(
-          { title: { $regex: search, $options: 'i' } },
-          { product: { $regex: search, $options: 'i' } },
-          { brand: { $regex: search, $options: 'i' } },
-          { description: { $regex: search, $options: 'i' } }
-        );
-      }
-
-      let categoryOr = [];
-      const effectiveCategory = category && category !== 'all' ? category : null;
-
-      if (effectiveCategory) {
-        const kws = categoryKeywords[effectiveCategory] || [];
-        categoryOr.push({ category: effectiveCategory });
-        categoryOr.push({ categories: effectiveCategory });
-
-        const keywordOr = [];
-        kws.forEach(k => {
-          keywordOr.push({ title: { $regex: k, $options: 'i' } });
-          keywordOr.push({ product: { $regex: k, $options: 'i' } });
-          keywordOr.push({ description: { $regex: k, $options: 'i' } });
-        });
-
-        if (keywordOr.length > 0) {
-          categoryOr.push({ $or: keywordOr });
-        }
-      }
-
-      let dbQuery = { ...dbBase };
-      if (searchOr.length > 0 && categoryOr.length > 0) {
-        dbQuery.$and = [ { $or: searchOr }, { $or: categoryOr } ];
-      } else if (searchOr.length > 0) {
-        dbQuery.$or = searchOr;
-      } else if (categoryOr.length > 0) {
-        dbQuery.$or = categoryOr;
-      }
-
-      if (retailer && retailer !== 'all') dbQuery.retailer = retailer;
-      if (riskLevel && riskLevel !== 'all') dbQuery.riskLevel = riskLevel;
+      // Build DB query using centralized helper
+      const dbQuery = buildDbQuery({ search, category, retailer, region, riskLevel });
 
       const dbResults = await Recall.find(dbQuery)
         .sort({ [sortBy]: sortOrder })
@@ -496,6 +447,15 @@ exports.getRecalls = async (req, res) => {
 
     recalls = recalls.map(recall => exports.normalizeRecallData(recall));
 
+    // Allow opt-in to include inactive recalls via query param
+    const includeInactive = String(req.query.includeInactive || '').toLowerCase() === 'true';
+
+    // Show only active recalls by default. Treat `undefined` as active
+    // for compatibility with older imported/API records.
+    if (!includeInactive) {
+      recalls = Array.isArray(recalls) ? recalls.filter(r => (r.isActive === undefined || r.isActive === true)) : [];
+    }
+
     // Fetch latest FSIS active recall for alert banner (non-blocking)
     let latestAlert = null;
     try {
@@ -508,7 +468,11 @@ exports.getRecalls = async (req, res) => {
     } catch (err) {
       // ignore alert fetch errors
     }
-    const totalPages = Math.ceil(total / limit);
+
+    // Recompute pagination: if including inactive, prefer the previous `total`
+    // (which reflects DB/API count). Otherwise compute from active-only list.
+    const activeTotal = includeInactive ? (total || recalls.length) : (recalls.length || 0);
+    const totalPages = Math.max(1, Math.ceil(activeTotal / limit));
 
     const categoryOptions = [
       { value: 'poultry', label: 'Poultry' },
@@ -582,7 +546,8 @@ exports.getRecalls = async (req, res) => {
         category: category || 'all',
         retailer: retailer || 'all',
         sortBy: sortBy || 'recallDate',
-        sortOrder: sortOrder === 1 ? 'asc' : 'desc'
+        sortOrder: sortOrder === 1 ? 'asc' : 'desc',
+        includeInactive: includeInactive ? 'true' : 'false'
       },
       categoryOptions,
       agencyOptions,
@@ -830,32 +795,132 @@ exports.lookupProduct = async (req, res) => {
 
 exports.getRecall = async (req, res) => {
   try {
-    let recall = await Recall.findById(req.params.id).lean();
-    
-    if (!recall) {
-      // Recall not in DB; redirecting to recalls list
+    // Load the stored document and keep original DB doc available so
+    // we can fetch provider-level fields when needed (e.g., for pinned recalls)
+    const originalDoc = await Recall.findById(req.params.id).lean();
+
+    if (!originalDoc) {
       return res.redirect('/recalls');
     }
 
-    recall = this.normalizeRecallData(recall);
+    const recall = this.normalizeRecallData(originalDoc);
 
-    const relatedRecalls = await Recall.find({
-      _id: { $ne: recall._id },
-      $or: [
-        { category: recall.category },
-        { brand: recall.brand },
-        { agency: recall.agency }
-      ],
-      isActive: true
-    })
-    .limit(4)
-    .lean()
-    .map(rec => this.normalizeRecallData(rec));
+    // Determine whether the current user has this recall pinned. Use
+    // the user session's `pinnedRecalls` array (if present) to decide.
+    let isPinned = false;
+    try {
+      if (req.user && Array.isArray(req.user.pinnedRecalls)) {
+        isPinned = req.user.pinnedRecalls.map(String).includes(String(originalDoc._id));
+      }
+    } catch (e) {
+      isPinned = false;
+    }
 
-    res.render('recall-detail', { // Changed from 'post' to 'recall-detail'
+    let relatedRecalls = [];
+    let extraProviderInfo = null;
+
+    if (isPinned) {
+      // For pinned recalls we prefer to show provider-specific contact/state
+      // details instead of the related active recalls list. Try to fetch
+      // the authoritative provider record from the API service so we can
+      // surface `field_state` and `field_company_media_contact` when present.
+      try {
+        // Attempt a focused fetch of recent FSIS records (may include the
+        // original provider payload under `rawData`), then find a matching
+        // provider recall by `recallId`.
+        const providerRecs = await recallApiService.fetchFSISRecalls({ limit: 500, monthsBack: 36 });
+        const matched = (providerRecs || []).find(r => String(r.recallId) === String(recall.recallId) || String(r.recallId) === String(originalDoc.recallId));
+
+        if (matched && (matched.rawData || matched)) {
+          const rd = matched.rawData || matched;
+          // FSIS-style field names (best-effort extraction)
+          const state = rd.field_state || rd.state || rd.State || rd.field_establishment_state || null;
+
+          // Company media contact may be an object or a string; try common locations
+          let media = rd.field_company_media_contact || rd.company_media_contact || rd.MediaContact || rd.media_contact || rd.field_media_contact || null;
+          let mediaName = null;
+          let mediaPhone = null;
+          let mediaEmail = null;
+
+          if (media) {
+            if (typeof media === 'string') {
+              // Try to extract phone and email heuristically from a single string
+              const phoneMatch = media.match(/(\+?\d[\d\s\-().]{6,}\d)/);
+              const emailMatch = media.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+              if (phoneMatch) {
+                mediaPhone = phoneMatch[0].trim();
+              }
+              if (emailMatch) {
+                mediaEmail = emailMatch[0].trim();
+              }
+
+              // Remove phone/email from name fragment
+              let nameFrag = media;
+              if (phoneMatch) nameFrag = nameFrag.replace(phoneMatch[0], '');
+              if (emailMatch) nameFrag = nameFrag.replace(emailMatch[0], '');
+              nameFrag = nameFrag.replace(/[:\-–—]/g, '').trim();
+              if (nameFrag.length > 0) mediaName = nameFrag;
+            } else if (typeof media === 'object') {
+              mediaName = media.name || media.contact_name || media.person || media.contact || null;
+              mediaPhone = media.phone || media.telephone || media.contact_phone || media.mobile || null;
+              mediaEmail = media.email || media.contact_email || media.contactEmail || null;
+            }
+          }
+
+          // Also check common locations in the raw provider record for an email
+          if (!mediaEmail && rd) {
+            const possible = rd.field_company_media_contact || rd.company_media_contact || rd.MediaContact || rd.media_contact || rd.field_media_contact || rd.contact || rd.contacts || null;
+            const textSearch = JSON.stringify(possible || rd || '');
+            const emailMatch2 = textSearch.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+            if (emailMatch2) mediaEmail = emailMatch2[0];
+          }
+
+          // Clean mediaName by removing obvious prefixes and the brand name
+          try {
+            if (mediaName && recall && recall.brand) {
+              // Remove common prefixes like 'Company Contact' and the brand string
+              const brandRegex = new RegExp(String(recall.brand).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig');
+              mediaName = mediaName.replace(/Company Contact/ig, '').replace(brandRegex, '').replace(/\bContact\b/ig, '').replace(/[:\-–—]/g, '').trim();
+              if (mediaName.length === 0) mediaName = null;
+            }
+          } catch (e) {
+            // ignore cleaning errors
+          }
+
+          extraProviderInfo = {
+            state: state || null,
+            mediaName: mediaName || null,
+            mediaPhone: mediaPhone || null,
+            mediaEmail: mediaEmail || null,
+            raw: rd
+          };
+        }
+      } catch (err) {
+        console.error('Failed to fetch provider details for pinned recall:', err && err.message);
+      }
+    } else {
+      // Non-pinned flow: load related active recalls as before
+      const relatedDocs = await Recall.find({
+        _id: { $ne: recall._id },
+        $or: [
+          { category: recall.category },
+          { brand: recall.brand },
+          { agency: recall.agency }
+        ],
+        isActive: true
+      })
+      .limit(4)
+      .lean();
+
+      relatedRecalls = Array.isArray(relatedDocs) ? relatedDocs.map(rec => this.normalizeRecallData(rec)) : [];
+    }
+
+    res.render('recall-detail', {
       title: `${recall.title} - FoodGuard`,
       recall: recall,
       relatedRecalls,
+      extraProviderInfo,
+      isPinned,
       user: req.user
     });
   } catch (error) {
@@ -878,19 +943,7 @@ exports.apiGetRecalls = async (req, res) => {
     let recalls = [];
 
     if (source === 'db' || source === 'all') {
-      const dbQuery = { isActive: true };
-      
-      if (search) {
-        dbQuery.$or = [
-          { title: { $regex: search, $options: 'i' } },
-          { product: { $regex: search, $options: 'i' } },
-          { brand: { $regex: search, $options: 'i' } }
-        ];
-      }
-      if (category && category !== 'all') dbQuery.category = category;
-      if (agency && agency !== 'all') dbQuery.agency = agency;
-      if (riskLevel && riskLevel !== 'all') dbQuery.riskLevel = riskLevel;
-
+      const dbQuery = buildDbQuery({ search, category, retailer: null, region: null, riskLevel, agency, includeActive: true });
       recalls = await Recall.find(dbQuery)
         .sort({ recallDate: -1 })
         .limit(parseInt(limit))
@@ -1210,10 +1263,22 @@ exports.saveApiResultsToDB = async (apiRecalls) => {
   if (!apiRecalls || !Array.isArray(apiRecalls)) return 0;
   
   let savedCount = 0;
+  let skippedCount = 0;
+
+  function recallIsIn2025(normalizedRecall) {
+    if (!normalizedRecall) return false;
+    const d = normalizedRecall.recallDate ? new Date(normalizedRecall.recallDate) : null;
+    return d && !isNaN(d.getTime()) && d.getFullYear && d.getFullYear() === 2025;
+  }
   
   for (const apiRecall of apiRecalls) {
     try {
       const normalizedRecall = this.normalizeRecallData(apiRecall);
+      // Only persist recalls that have a recall/publish date in 2025
+      if (!recallIsIn2025(normalizedRecall)) {
+        skippedCount++;
+        continue;
+      }
       
       const existingRecall = await Recall.findOne({
         recallId: normalizedRecall.recallId
@@ -1234,6 +1299,7 @@ exports.saveApiResultsToDB = async (apiRecalls) => {
   }
   
   // Saved new recalls count (log removed)
+  if (skippedCount > 0) console.log(`Skipped ${skippedCount} API recalls not in 2025 when saving to DB.`);
   return savedCount;
 };
 

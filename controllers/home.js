@@ -7,6 +7,7 @@
 const Post = require('../models/Post');
 const Recall = require('../models/Recall');
 const recallsController = require('./recalls');
+const User = require('../models/User');
 
 // We'll use a small set of local images (placed under `public/imgs/home/`)
 // and match them semantically to recall titles/products/brands when possible.
@@ -194,6 +195,20 @@ exports.getHome = async (req, res) => {
             console.warn('MongoDB not connected — homepage will show no recalls');
         }
 
+        // If user is logged in, load their pinned recalls for the homepage widget
+        let pinnedRecalls = [];
+        if (req.user) {
+            try {
+                const u = await User.findById(req.user.id).populate({ path: 'pinnedRecalls' }).lean();
+                pinnedRecalls = (u && u.pinnedRecalls) ? u.pinnedRecalls.map(pr => {
+                    // Normalize minimal fields for display
+                    return { _id: pr._id, title: pr.title, description: pr.description || pr.reason || '', brand: pr.brand || pr.company || '', recallDate: pr.recallDate, isActive: pr.isActive, agency: pr.agency };
+                }) : [];
+            } catch (err) {
+                console.warn('Failed to load user pinned recalls for homepage:', err && err.message);
+            }
+        }
+
         // Fetch latest FSIS recall for banner (best-effort)
         let latestAlert = null;
         try {
@@ -208,7 +223,7 @@ exports.getHome = async (req, res) => {
             // ignore
         }
 
-        res.render('index', { title: 'FoodGuard - Home', recalls: activeRecalls, posts: recentPosts, user: req.user, latestAlert });
+        res.render('index', { title: 'FoodGuard - Home', recalls: activeRecalls, posts: recentPosts, user: req.user, latestAlert, pinnedRecalls });
     } catch (err) {
         console.error('Home controller error:', err && err.message);
         res.render('index', { title: 'FoodGuard - Home', recalls: [], posts: [], user: req.user });

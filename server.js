@@ -126,4 +126,16 @@ const startServer = async () => {
   }
 };
 
+// === Scheduled Tasks ===
+const cron = require('node-cron');
+const { exec } = require('child_process');
+
+// Schedule the active-update to run twice daily: at 00:00 and 12:00 server time
+cron.schedule('0 0,12 * * *', () => {
+  exec('node ./scripts/update_active_from_usda.js --backup', { cwd: __dirname }, (err, stdout, stderr) => {
+    if (err) console.error('Active update failed:', err);
+    else console.log('Active update run:', stdout);
+  });
+});
+
 startServer();

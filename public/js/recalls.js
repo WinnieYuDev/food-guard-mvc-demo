@@ -28,7 +28,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (searchEl) searchEl.addEventListener('input', debounce(handleRecallFilter, 500));
     try { if (typeof loadRecallNews === 'function') loadRecallNews(); } catch (e) { console.warn('loadRecallNews failed to init', e); }
 
-    // (retailer quick-pick removed; use the retailer dropdown filter)
 });
 
 async function handleProductLookup(e) {

@@ -27,7 +27,7 @@
         
         <div class="bg-white rounded-lg shadow-sm p-6 mb-8 border border-gray-200">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Product Lookup</h2>
-            <p class="text-gray-600 mb-4">Enter a product name or barcode to check for recalls and get product information.</p>
+            <p class="text-gray-600 mb-4">Enter a product name or barcode to check for allergens and get product information.</p>
             
             <form id="productLookupForm" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -62,6 +62,7 @@
         <div class="bg-white rounded-lg shadow-sm p-6 mb-8 border border-gray-200">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Filter Recalls</h2>
             <form method="GET" action="/recalls" id="recallFilters" class="space-y-4">
+                <input type="hidden" id="pageInput" name="page" value="<%= pagination && pagination.page ? pagination.page : 1 %>" />
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     
                     <div>
@@ -136,12 +137,16 @@
                 </div>
                 
                 <div class="flex flex-wrap gap-3">
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium transition-colors">
+                    <button id="applyFiltersBtn" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium transition-colors">
                         Apply Filters
                     </button>
                     <a href="/recalls" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-md font-medium transition-colors">
                         Clear All
                     </a>
+                    <label class="ml-4 inline-flex items-center text-sm text-gray-700">
+                        <input id="includeInactive" name="includeInactive" type="checkbox" value="true" class="mr-2" <%= (filters && filters.includeInactive === 'true') ? 'checked' : '' %> />
+                        Include inactive
+                    </label>
                 </div>
             </form>
         </div>
@@ -149,14 +154,15 @@
         
         <div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                <% const activeCount = Array.isArray(recalls) ? recalls.filter(r => (r.isActive === undefined || r.isActive === true)).length : 0; %>
                 <h2 class="text-xl font-semibold text-gray-900">
-                    Active Recalls
-                    <% if (recalls.length > 0) { %>
-                        <span class="ml-2 bg-red-100 text-red-800 text-sm font-medium px-2.5 py-0.5 rounded-full">
-                            <%= recalls.length %> Active
-                        </span>
-                    <% } %>
-                </h2>
+                        Active Recalls
+                        <% if (activeCount > 0) { %>
+                            <span class="ml-2 bg-red-100 text-red-800 text-sm font-medium px-2.5 py-0.5 rounded-full">
+                                <%= activeCount %> Active
+                            </span>
+                        <% } %>
+                    </h2>
             </div>
 
             
@@ -220,15 +226,29 @@
                             <div class="mt-3 flex justify-end">
                                 <a href="<%= recall.articleLink || (recall.rawData && recall.rawData.field_recall_url) || '#' %>" target="_blank" rel="noopener noreferrer" class="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md">View Details</a>
                                 <% if (user) { %>
-                                    <% const isPinned = pinnedRecallIds && pinnedRecallIds.includes(String(recall._id)); %>
-                                    <% if (isPinned) { %>
-                                        <form action="/recalls/<%= recall._id %>/unpin" method="POST" class="inline ml-2">
-                                            <button type="submit" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded-md">Unpin</button>
-                                        </form>
+                                    <% if (recall && recall._id) { %>
+                                        <% const isPinned = pinnedRecallIds && pinnedRecallIds.includes(String(recall._id)); %>
+                                        <% if (isPinned) { %>
+                                            <form action="/recalls/<%= recall._id %>/unpin" method="POST" class="inline ml-2">
+                                                <button type="submit" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded-md">Unpin</button>
+                                            </form>
+                                        <% } else { %>
+                                            <form action="/recalls/<%= recall._id %>/pin" method="POST" class="inline ml-2">
+                                                <button type="submit" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded-md">Pin</button>
+                                            </form>
+                                        <% } %>
                                     <% } else { %>
-                                        <form action="/recalls/<%= recall._id %>/pin" method="POST" class="inline ml-2">
-                                            <button type="submit" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded-md">Pin</button>
-                                        </form>
+                                        <% 
+                                            // Determine provider recall identifier from available fields
+                                            const providerId = recall.recallId || recall.recall_number || (recall.rawData && (recall.rawData.recall_number || recall.rawData.RecallNumber || recall.rawData.RecallID || recall.rawData.RecallId));
+                                        %>
+                                        <% if (providerId) { %>
+                                            <form action="/recalls/pin-by/<%= encodeURIComponent(providerId) %>" method="POST" class="inline ml-2">
+                                                <button type="submit" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1 rounded-md">Save & Pin</button>
+                                            </form>
+                                        <% } else { %>
+                                            <button type="button" class="text-sm bg-gray-50 text-gray-500 px-3 py-1 rounded-md ml-2" title="Pin unavailable for this result">Pin</button>
+                                        <% } %>
                                     <% } %>
                                 <% } %>
                             </div>
@@ -288,11 +308,29 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const filters = ['category', 'retailer', 'riskLevel', 'sortOrder'];
+        const filters = ['category', 'retailer', 'riskLevel', 'sortOrder', 'includeInactive'];
+        const pageInput = document.getElementById('pageInput');
+        const applyBtn = document.getElementById('applyFiltersBtn');
         filters.forEach(filterId => {
             const element = document.getElementById(filterId);
-            if (element) element.addEventListener('change', () => document.getElementById('recallFilters').submit());
+            if (!element) return;
+            element.addEventListener('change', () => {
+                // Preserve current page when toggling 'includeInactive'.
+                // For other filter changes, reset to page 1 so results start at the beginning.
+                if (filterId === 'includeInactive') {
+                    // keep current pageInput.value
+                } else {
+                    if (pageInput) pageInput.value = '1';
+                }
+                document.getElementById('recallFilters').submit();
+            });
         });
+        // When the user clicks the Apply Filters button, reset to page 1
+        if (applyBtn) {
+            applyBtn.addEventListener('click', function() {
+                if (pageInput) pageInput.value = '1';
+            });
+        }
     });
 </script>
 

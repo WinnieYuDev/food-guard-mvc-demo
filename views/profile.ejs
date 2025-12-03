@@ -11,7 +11,11 @@
                     <% pinnedRecalls.forEach(r => { %>
                         <li class="flex items-start justify-between">
                             <div>
-                                <a href="/recalls/<%= r._id %>" class="text-usda-blue font-medium"><%= r.title %></a>
+                                <% if (r.articleLink) { %>
+                                    <a href="<%= r.articleLink %>" target="_blank" rel="noopener noreferrer" class="text-usda-blue font-medium"><%= r.title %></a>
+                                <% } else { %>
+                                    <a href="/recalls/<%= r._id %>" class="text-usda-blue font-medium"><%= r.title %></a>
+                                <% } %>
                                 <div class="text-sm text-gray-600 flex items-center space-x-3">
                                     <span><%= new Date(r.recallDate).toLocaleDateString() %> — <%= r.agency %></span>
                                     <% if (r && r.isActive === false) { %>
