@@ -23,19 +23,33 @@
     </section>
 
     
-    <section class="py-20">
+    <section class="py-20 mission-section">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-16 space-y-6">
-                <h2 class="text-3xl font-bold text-gray-900">Our Mission</h2>
-                <p class="text-lg text-gray-600 max-w-4xl mx-auto leading-relaxed text-center px-4 sm:px-6">
-                    FoodGuard was created to bridge the gap between official food recall announcements
-                    and public awareness. We believe that everyone deserves access to timely, accurate
-                    information about food safety risks.
-                </p>
+            <div class="mission-inner grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                <div class="mission-image">
+                    <img src="/imgs/about/mission.jpg" alt="FoodGuard mission" class="w-full h-80 md:h-96 object-cover rounded-xl shadow-lg mission-img">
+                    <div class="floating-words">
+                        <span class="floating-word">Protect</span>
+                        <span class="floating-word">Inform</span>
+                        <span class="floating-word">Help</span>
+                    </div>
+                </div>
+
+                <div class="mission-content text-center md:text-left">
+                    <h2 class="text-3xl md:text-4xl font-extrabold text-gray-900 mission-title">Our Mission</h2>
+                    <p class="text-lg text-gray-700 max-w-4xl leading-relaxed mt-4 mission-copy">
+                        FoodGuard was created to bridge the gap between official food recall announcements
+                        and public awareness. We believe that everyone deserves access to timely, accurate
+                        information about food safety risks so families can make safer choices.
+                    </p>
+
+                    <div class="mt-6">
+                        <p class="inline-block mission-highlight">Trusted data · Clear guidance · Community-driven</p>
+                    </div>
+                </div>
             </div>
 
-            
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mt-12 mb-16">
                 <% if (locals.stats) { %>
                     <% stats.forEach(stat => { %>
                         <div class="text-center">
@@ -45,8 +59,6 @@
                     <% }); %>
                 <% } %>
             </div>
-
-            
         </div>
     </section>
 

@@ -242,3 +242,83 @@ textarea:focus {
     .step-content { flex-direction: column; align-items: flex-start; padding: 1rem; }
     .step-title { font-size: 1.5rem; }
 }
+
+/* About page: mission image, popping and moving text, and richer background */
+@keyframes popIn {
+    0% { transform: scale(0.96); opacity: 0; }
+    60% { transform: scale(1.02); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes floatY {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+    100% { transform: translateY(0px); }
+}
+
+@keyframes slideInLeft {
+    0% { transform: translateX(-18px); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+}
+
+.mission-section { position: relative; background: linear-gradient(135deg, #f6fbff 0%, #f0f7fb 40%, #eef6fa 100%); }
+.mission-inner { align-items: center; }
+.mission-image { position: relative; }
+.mission-img { border-radius: 12px; display: block; will-change: transform, opacity; }
+
+/* mission image slide-in */
+@keyframes slideInRight {
+    0% { transform: translateX(28px) scale(0.98); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+}
+
+.mission-img {
+    animation: slideInRight 760ms cubic-bezier(.2,.9,.2,1) both;
+    transition: transform 360ms ease, box-shadow 360ms ease;
+}
+.mission-image:hover .mission-img {
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: 0 18px 40px rgba(2,6,23,0.12);
+}
+
+/* subtle moving background accent behind mission section */
+@keyframes moveAccent {
+    0% { transform: translateX(-6%); }
+    50% { transform: translateX(6%); }
+    100% { transform: translateX(-6%); }
+}
+.mission-section::before {
+    animation: moveAccent 16s linear infinite;
+}
+.floating-words {
+    /* Hidden: remove floating/popping words that overlapped content */
+    display: none !important;
+}
+.floating-word { display: none !important; }
+
+.mission-content {
+    /* Disable entrance animation so the title and content remain stable */
+    animation: none !important;
+}
+.mission-title {
+    color: #05294a;
+    /* Disable pop-in animation to prevent shifting */
+    animation: none !important;
+}
+.mission-copy { animation: popIn 680ms cubic-bezier(.2,.9,.2,1); }
+.mission-highlight { background: linear-gradient(90deg, rgba(5,41,74,0.12), rgba(0,93,162,0.08)); color:#053661; padding:10px 14px; border-radius:999px; font-weight:700; box-shadow: 0 8px 24px rgba(5,41,74,0.06); }
+
+/* subtle moving diagonal background accent behind the mission section */
+.mission-section::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(120deg, rgba(5,94,162,0.03), rgba(0,169,219,0.02));
+        mix-blend-mode: overlay;
+}
+
+@media (max-width: 768px) {
+        .floating-words { position: absolute; right: 10px; top: 10px; gap:6px; }
+        .floating-word { font-size: 0.85rem; padding:5px 8px; }
+}
