@@ -1,21 +1,28 @@
 # FoodGuard — Food Safety & Recall Demo (MVC)
 
-FoodGuard is a small demo web app that collects food recall data and shows it in a friendly dashboard.
-It is built as an educational, project using the classic MVC pattern (models, views, controllers).
+FoodGuard is food safety web application that instantly alerts users about FDA recalls. It provides users real-time product safety information, while helping families make informed decisions about the food they consume.
+It is built as an educational project using the classic MVC pattern (models, views, controllers).
 
-Screenshot: `public/imgs/website.jpg` (used in the project)
-
-Summary
-- Shows active food recalls and community posts on the homepage
-- Pulls/ingests recall data into MongoDB and renders simplified, readable cards
-- Simple user auth, post creation, and image uploads (Cloudinary)
-
+<img alt="website preview" src="/public/imgs/preview.jpg">
 
 Main features
+- Displays active food recalls and community posts on the homepage.
+- Periodically pulls recall data (USDA and other sources) into MongoDB
+- Normalizes and stores recall records, then renders simplified, readable cards with risk-level badges and location info
+- Robust filtering of active and inactive recalls based on food category, risk level, retailer, and states affected
+- Basic user authentication (Passport), community post creation, and image uploads (Cloudinary + Multer)
 - Active recall listing with risk-level badges and locations
-- Title/Reason sanitization to remove noise (weights, duplicate words, repeated locations)
-- Keyword-based image selection plus category fallbacks
-- Recent community posts and basic authentication
+- Keyword-based product information look up including allergen and ingredient information
+
+Tech stack
+- **Runtime & framework:** Node.js, Express, Tailwind
+- **Templating:** EJS
+- **Database:** MongoDB (Mongoose)
+- **Authentication:** Passport.js (local)
+- **File uploads & images:** Multer, Cloudinary
+- **HTTP / API:** Axios
+- **Scheduling:** `node-cron` (update scripts)
+- **Other:** dotenv, bcryptjs, express-session, connect-mongo, sharp
 
 Launching the app
 1. Clone:
@@ -42,5 +49,15 @@ Launching the app
   ```
 5. Open `http://localhost:3000` in your browser.
 
+## Examples:
+Take a look at similar projects!
+
+Boston Community Swap: https://github.com/WinnieYuDev/community-trade-fullstack
+
+Home Cooking Reviews: https://github.com/WinnieYuDev/home-cooking-fullstack
+
+## Backend Technologies
+MongoDB Atlas: https://www.mongodb.com/atlas/database
+
 License & credits
-- This demo is for learning and demo purposes. Images are provided by Unsplash (via direct URLs) or local assets in `public/imgs`.
+- Images are provided by Unsplash (via direct URLs) or local assets in `public/imgs`.
