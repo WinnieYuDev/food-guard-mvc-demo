@@ -5,7 +5,7 @@ It is built as an educational project using the classic MVC pattern (models, vie
 
 <img alt="website preview" src="/public/imgs/preview.jpg">
 
-Main features
+## Main features
 - Displays active food recalls and community posts on the homepage.
 - Periodically pulls recall data (USDA and other sources) into MongoDB
 - Normalizes and stores recall records, then renders simplified, readable cards with risk-level badges and location info
@@ -14,7 +14,7 @@ Main features
 - Active recall listing with risk-level badges and locations
 - Keyword-based product information look up including allergen and ingredient information
 
-Tech stack
+## Tech stack
 - **Runtime & framework:** Node.js, Express, Tailwind
 - **Templating:** EJS
 - **Database:** MongoDB (Mongoose)
@@ -24,7 +24,7 @@ Tech stack
 - **Scheduling:** `node-cron` (update scripts)
 - **Other:** dotenv, bcryptjs, express-session, connect-mongo, sharp
 
-Launching the app
+## Launching the app
 1. Clone:
   ```powershell
   git clone https://github.com/WinnieYuDev/food-guard-mvc-demo
@@ -59,5 +59,5 @@ Home Cooking Reviews: https://github.com/WinnieYuDev/home-cooking-fullstack
 ## Backend Technologies
 MongoDB Atlas: https://www.mongodb.com/atlas/database
 
-License & credits
+## License & credits
 - Images are provided by Unsplash (via direct URLs) or local assets in `public/imgs`.
