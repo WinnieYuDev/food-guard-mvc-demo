@@ -5,6 +5,7 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <section class="bg-white rounded-lg p-6 border border-gray-200">
+            <!-- Pinned Recalls Section -->
             <h2 class="text-lg font-semibold mb-3">Pinned Recalls</h2>
             <% if (pinnedRecalls && pinnedRecalls.length) { %>
                 <ul class="space-y-4">
@@ -39,7 +40,7 @@
                 <p class="text-gray-600">You have not pinned any recalls yet.</p>
             <% } %>
         </section>
-
+        <!-- User Comments Section -->
         <section class="bg-white rounded-lg p-6 border border-gray-200">
             <h2 class="text-lg font-semibold mb-3">Your Comments</h2>
             <% if (comments && comments.length) { %>
