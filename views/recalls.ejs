@@ -301,6 +301,7 @@ function buildQueryString(filters) {
     if (filters.retailer !== 'all') params.push(`retailer=${filters.retailer}`);
     if (filters.riskLevel !== 'all') params.push(`riskLevel=${filters.riskLevel}`);
     if (filters.sortOrder && filters.sortOrder !== 'desc') params.push(`sortOrder=${filters.sortOrder}`);
+    if (filters.includeInactive === 'true') params.push(`includeInactive=true`);
     return params.length > 0 ? '&' + params.join('&') : '';
 }
 %>

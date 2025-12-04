@@ -256,24 +256,36 @@ const isNonFoodItem = (productText, titleText) => {
   return nonFoodKeywords.some(keyword => combined.includes(keyword));
 };
 
-const fetchJson = (url, timeout = 8000) => new Promise((resolve, reject) => {
-  const req = https.get(url, { timeout }, (res) => {
-    let data = '';
-    res.on('data', chunk => data += chunk);
-    res.on('end', () => {
-      try {
-        const parsed = JSON.parse(data);
-        resolve(parsed);
-      } catch (err) {
-        reject(err);
-      }
-    });
-  });
-  req.on('error', reject);
-  req.on('timeout', () => {
-    req.destroy(new Error('Request timed out'));
-  });
-});
+const fetchJson = async (url, timeout = 8000, retries = 1) => {
+  const headers = {
+    'User-Agent': 'FoodGuard/1.0 (+https://github.com/WinnieYuDev/food-guard-mvc-demo)',
+    'Accept': 'application/json'
+  };
+
+  let attempt = 0;
+  let lastErr = null;
+  while (attempt <= retries) {
+    try {
+      const resp = await axios.get(url, {
+        timeout,
+        headers,
+        maxRedirects: 3,
+        httpsAgent: new https.Agent({ keepAlive: true })
+      });
+      return resp.data;
+    } catch (err) {
+      lastErr = err;
+      attempt += 1;
+      if (attempt > retries) break;
+      // backoff before retrying
+      const wait = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+      await new Promise(r => setTimeout(r, wait));
+      // increase timeout slightly for next attempt
+      timeout = Math.min(timeout * 2, 20000);
+    }
+  }
+  throw lastErr;
+};
 
 /**
  * getRecalls
