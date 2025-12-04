@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // scripts/update_active_from_usda.js
 // Usage:
 //  node scripts/update_active_from_usda.js [--backup] [--dry-run] [--purge-pre2025]
