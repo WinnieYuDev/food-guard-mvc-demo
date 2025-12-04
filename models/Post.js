@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-
+// Comment subdocument schema
 const commentSchema = new mongoose.Schema({
   content: {
     type: String,
@@ -18,7 +18,7 @@ const commentSchema = new mongoose.Schema({
 }, { 
   timestamps: true 
 });
-
+// Main Post schema
 const postSchema = new mongoose.Schema({
   title: {
     type: String,

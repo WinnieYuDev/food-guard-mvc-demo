@@ -30,7 +30,7 @@ const localImageKeywords = {
     '/imgs/home/pulledpork.jpg': ['pulled pork', 'pulledpork', 'pulled', 'barbecue', 'bbq'],
     '/imgs/home/spinach.jpg': ['spinach']
 };
-
+// Find a local image that matches the given text based on keywords.
 const findLocalImageForText = (text) => {
     if (!text) return null;
     const normalized = text.toLowerCase();
@@ -52,7 +52,7 @@ const removeWeightPatterns = (s) => {
     return s.replace(/\b\d+(?:[\.,]\d+)?\s?(?:lbs?|pounds?|oz|ounces?|kgs?|kg|g)\b/ig, '')
         .replace(/\(\s*\d+(?:[\.,]\d+)?\s?(?:lbs?|pounds?|oz|ounces?|kgs?|kg|g)\s*\)/ig, '');
 };
-
+// Remove duplicate items in comma-separated lists
 const dedupeCommaParts = (s) => {
     if (!s) return s;
     const parts = s.split(/[,/\-]+/).map(p => p.trim()).filter(Boolean);
@@ -64,7 +64,7 @@ const dedupeCommaParts = (s) => {
     }
     return out.join(', ');
 };
-
+// Remove consecutive duplicate words (e.g. "Fresh Fresh")
 const removeDuplicateAdjacentWords = (s) => {
     if (!s) return s;
     const words = s.split(/\s+/);
@@ -75,7 +75,7 @@ const removeDuplicateAdjacentWords = (s) => {
     }
     return out.join(' ');
 };
-
+// Sanitize title text for UI display
 const sanitizeTitle = (title) => {
     if (!title) return title;
     let s = title;
@@ -86,7 +86,7 @@ const sanitizeTitle = (title) => {
     s = s.replace(/^[,\-:\s]+|[,\-:\s]+$/g, '');
     return s;
 };
-
+// Sanitize reason/description text for UI display
 const sanitizeReason = (reason, title) => {
     if (!reason) return reason;
     let r = reason;

@@ -10,7 +10,7 @@ const router = express.Router();
 const postsController = require('../controllers/posts');
 const { isLoggedIn } = require('../middleware/auth');
 const { upload, handleCloudinaryUpload } = require('../middleware/multer');
-
+// List all posts
 router.get('/', isLoggedIn, postsController.getPosts);
 
 router.get('/:id', isLoggedIn, postsController.getPost);

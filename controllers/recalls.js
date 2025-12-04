@@ -319,7 +319,7 @@ exports.getRecalls = async (req, res) => {
       apiFilters.category = category;
     }
     if (retailer && retailer !== 'all') apiFilters.retailer = retailer;
-
+// Build DB query from filters
     const categoryKeywords = {
       poultry: ['chicken','turkey','poultry','hen','duck','goose','quail','pheasant','partridge','grouse','guinea fowl','pheasant','partridge','grouse','guinea fowl'],
       beef: ['beef','steak','burger', 'ground beef', 'hamburger', 'beef patty', 'burger patty', 'ground beef patty'],
@@ -612,13 +612,12 @@ exports.getRecalls = async (req, res) => {
     });
   }
 };
-
+// Product lookup handler. Accepts barcode or product name, queries
+// OpenFoodFacts API for product details, searches recalls DB and external
+// recall APIs for related recalls, and returns a structured JSON response.
 exports.lookupProduct = async (req, res) => {
   try {
     const { barcode, productName } = req.body;
-    
-    
-
     if (!barcode && !productName) {
       return res.status(400).json({
         success: false,
@@ -696,7 +695,7 @@ exports.lookupProduct = async (req, res) => {
     }
 
     relatedRecalls = relatedRecalls.map(recall => this.normalizeRecallData(recall));
-
+// Determine safety info based on related recalls
     const safetyInfo = relatedRecalls.length > 0 ? {
       status: 'RECALL_ACTIVE',
       message: 'This product has active recalls. Do not consume.',
@@ -928,7 +927,7 @@ exports.getRecall = async (req, res) => {
     res.redirect('/recalls');
   }
 };
-
+// API endpoint to fetch recalls in JSON format
 exports.apiGetRecalls = async (req, res) => {
   try {
     const { 

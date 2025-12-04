@@ -3,7 +3,7 @@ const Recall = require('../models/Recall');
 const Post = require('../models/Post');
 const recallApi = require('../services/recallAPI');
 const recallsController = require('./recalls');
-
+// User controller
 module.exports = {
   getProfile: async (req, res) => {
     try {
@@ -41,7 +41,7 @@ module.exports = {
       res.redirect('/');
     }
   },
-
+// Pin a recall to the user's profile
   pinRecall: async (req, res) => {
     try {
       if (!req.user) return res.status(401).send('Unauthorized');
@@ -74,7 +74,7 @@ module.exports = {
       res.redirect('back');
     }
   },
-
+// Unpin a recall from the user's profile
   unpinRecall: async (req, res) => {
     try {
       if (!req.user) return res.status(401).send('Unauthorized');

@@ -6,20 +6,20 @@
  * search, and dynamically loading the recall news sidebar via the
  * server-side news endpoint.
  */
-
+// Wait for DOM content to load before initializing
 document.addEventListener('DOMContentLoaded', function() {
     const productLookupForm = document.getElementById('productLookupForm');
     if (productLookupForm) {
         productLookupForm.addEventListener('submit', handleProductLookup);
     }
-
+// Filter controls
     const searchEl = document.getElementById('search');
     const categoryEl = document.getElementById('category');
     const retailerEl = document.getElementById('retailer');
     const regionEl = document.getElementById('region');
     const riskEl = document.getElementById('riskLevel');
     const sortOrderEl = document.getElementById('sortOrder');
-
+// Attach event listeners
     if (categoryEl) categoryEl.addEventListener('change', handleRecallFilter);
     if (retailerEl) retailerEl.addEventListener('change', handleRecallFilter);
     if (regionEl) regionEl.addEventListener('change', handleRecallFilter);
@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
     try { if (typeof loadRecallNews === 'function') loadRecallNews(); } catch (e) { console.warn('loadRecallNews failed to init', e); }
 
 });
-
+// Handle product lookup form submission
 async function handleProductLookup(e) {
     e.preventDefault(); // Prevent form from submitting normally
     
@@ -68,7 +68,7 @@ async function handleProductLookup(e) {
         `;
     }
 }
-
+// Display product lookup results
 function displayProductResults(data) {
     const resultsDiv = document.getElementById('productResults');
     
@@ -131,7 +131,7 @@ function displayProductResults(data) {
         </div>
     `;
 }
-
+// Handle recall filter changes
 function handleRecallFilter() {
     const search = (document.getElementById('search') && document.getElementById('search').value) || '';
     const category = (document.getElementById('category') && document.getElementById('category').value) || 'all';
@@ -152,7 +152,7 @@ function handleRecallFilter() {
     const target = query ? ('/recalls?' + query) : '/recalls';
     window.location.href = target;
 }
-
+// Debounce utility function
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -165,7 +165,7 @@ function debounce(func, wait) {
     };
 }
 
-
+// Load recent recall news into sidebar
 async function loadRecallNews() {
     const recallNewsList = document.getElementById('recallNewsList');
     if (!recallNewsList) return;

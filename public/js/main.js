@@ -8,14 +8,14 @@
  * These functions are intentionally minimal and are intended for
  * progressive enhancement of EJS-rendered pages.
  */
-
+// Wait for DOM content to load before initializing
 document.addEventListener('DOMContentLoaded', function() {
     initializeMobileMenu();
     initializeFlashMessages();
     initializeFormValidation();
     initializeLikeButtons();
 });
-
+// Debounce utility function
 function initializeMobileMenu() {
     const mobileMenuButton = document.getElementById('mobileMenuButton');
     const sidebar = document.querySelector('aside');
@@ -33,7 +33,7 @@ function initializeMobileMenu() {
         });
     }
 }
-
+// Flash message auto-fade
 function initializeFlashMessages() {
     const flashMessages = document.querySelectorAll('[class*="bg-"].border');
     
@@ -49,7 +49,7 @@ function initializeFlashMessages() {
         }, 5000); // 5 seconds
     });
 }
-
+// Simple form validation
 function initializeFormValidation() {
     const forms = document.querySelectorAll('form');
     
@@ -74,17 +74,17 @@ function initializeFormValidation() {
         });
     });
 }
-
+// Helper functions for form validation
 function highlightFieldError(field) {
     field.classList.add('border-red-500');
     field.classList.remove('border-gray-300');
 }
-
+// Helper functions for form validation
 function clearFieldError(field) {
     field.classList.remove('border-red-500');
     field.classList.add('border-gray-300');
 }
-
+// Display form error message
 function showFormError(message) {
     const errorDiv = document.createElement('div');
     errorDiv.className = 'mb-4 p-4 bg-red-50 border border-red-200 rounded-lg';
@@ -108,7 +108,7 @@ function showFormError(message) {
         }, 5000);
     }
 }
-
+// Like button animation
 function initializeLikeButtons() {
     const likeButtons = document.querySelectorAll('form[action*="/like"] button');
     
@@ -125,11 +125,11 @@ function initializeLikeButtons() {
         });
     });
 }
-
+// Confirm action dialog
 function confirmAction(message) {
     return confirm(message || 'Are you sure you want to proceed?');
 }
-
+// Set loading state on button
 function setLoadingState(element, isLoading) {
     if (isLoading) {
         element.disabled = true;
@@ -146,7 +146,7 @@ function setLoadingState(element, isLoading) {
         }
     }
 }
-
+// Debounce utility function
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         confirmAction,

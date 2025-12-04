@@ -1,5 +1,5 @@
 const Post = require('../models/Post');
-
+// Posts controller
 module.exports = {
   getPosts: async (req, res) => {
     try {
@@ -43,7 +43,7 @@ module.exports = {
       });
     }
   },
-
+// View a single post with comments
   getPost: async (req, res) => {
     try {
       const post = await Post.findById(req.params.id)
@@ -66,7 +66,7 @@ module.exports = {
       res.redirect('/posts');
     }
   },
-
+// Create a new post
   createPost: async (req, res) => {
     try {
       let imageData = null;
@@ -100,7 +100,7 @@ module.exports = {
       res.redirect('/posts/new');
     }
   },
-
+// Like a post
   likePost: async (req, res) => {
     try {
       await Post.findOneAndUpdate(
@@ -117,7 +117,7 @@ module.exports = {
       res.redirect('/posts');
     }
   },
-
+// Delete a post
   deletePost: async (req, res) => {
     try {
       const post = await Post.findById(req.params.id);
@@ -148,7 +148,7 @@ module.exports = {
       res.redirect('/posts');
     }
   },
-
+// Add a comment to a post
   addComment: async (req, res) => {
     try {
       const { content } = req.body;
@@ -178,7 +178,7 @@ module.exports = {
       res.redirect('/posts');
     }
   },
-
+// Like a comment
   likeComment: async (req, res) => {
     try {
       const { postId, commentId } = req.params;
@@ -209,7 +209,7 @@ module.exports = {
       res.redirect('/posts');
     }
   },
-
+// Delete a comment authored by the current user
   deleteComment: async (req, res) => {
     try {
       const { postId, commentId } = req.params;

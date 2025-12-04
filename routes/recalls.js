@@ -8,7 +8,7 @@ const router = express.Router();
 const recallsController = require('../controllers/recalls');
 const userController = require('../controllers/user');
 const { isLoggedIn } = require('../middleware/auth');
-
+// Recall listing and detail pages
 router.get('/', recallsController.getRecalls);
 
 router.get('/news', recallsController.getNews);

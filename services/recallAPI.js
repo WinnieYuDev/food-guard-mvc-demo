@@ -231,7 +231,7 @@ class RecallApiService {
       { cat: 'fruits', kws: ['apple','berry','orange','melon','banana','grape','mango','peach','pear','pineapple'] },
       { cat: 'baby-food', kws: ['baby','infant'] }
     ];
-
+// Check each category list for matches
     for (const entry of lists) {
       for (const k of entry.kws) {
         if (descLower.includes(k)) { pushIf(out, entry.cat); break; }
@@ -242,7 +242,7 @@ class RecallApiService {
     if (out.length === 0) out.push('other');
     return out.slice(0, maxCount);
   }
-
+// Transform FSIS recall data into normalized recall objects
   transformFSISData(fsisData) {
     if (!Array.isArray(fsisData)) return [];
     return fsisData.map(recall => {
@@ -297,7 +297,7 @@ class RecallApiService {
       };
     });
   }
-
+// Extract affected states from distribution pattern text
   extractStates(distributionPattern) {
     if (!distributionPattern) return ['Nationwide'];
 
@@ -337,7 +337,7 @@ class RecallApiService {
 
     return ['Multiple States'];
   }
-
+// Determine risk level based on reason for recall
   determineRiskLevel(reason) {
     if (!reason) return 'medium';
     
@@ -365,7 +365,7 @@ class RecallApiService {
     
     return 'low';
   }
-
+// Determine single category from product description
   determineCategory(productDescription) {
     if (!productDescription) return 'other';
     
@@ -403,7 +403,7 @@ class RecallApiService {
 
     return 'other';
   }
-
+// === Mock Data for Testing/Fallback ===
   getMockRecalls(filters = {}) {
     const currentDate = new Date();
     const mockRecalls = [

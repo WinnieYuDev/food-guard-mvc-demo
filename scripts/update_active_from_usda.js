@@ -8,11 +8,7 @@
 // `field_active_notice` (only those where that field is true are marked active).
 //
 // NOTE: This script now only processes recalls whose publish/recall date
-// falls in the calendar year 2025 (>= 2025-01-01 and < 2026-01-01).
-// Records outside 2025 are skipped (not created) to keep the DB focused
-// on 2025 recalls. This script does not delete pre-2025 records; use the
-// `--purge-pre2025` flag if you want to remove older records (not implemented
-// by default to avoid accidental data loss).
+// falls in the calendar year 2025
 
 require('dotenv').config();
 const fs = require('fs');
@@ -25,7 +21,7 @@ const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run') || args.includes('-n');
 const doBackup = args.includes('--backup') || args.includes('-b');
 const purgePre2025 = args.includes('--purge-pre2025');
-
+// Main async function to run the update process
 (async () => {
   try {
     if (!process.env.MONGODB_URI) {
@@ -37,7 +33,7 @@ const purgePre2025 = args.includes('--purge-pre2025');
 
     const allExisting = await Recall.find({}).lean();
     console.log(`DB contains ${allExisting.length} recall records.`);
-
+// Backup existing records if requested
     if (doBackup) {
       const backupsDir = path.join(__dirname, '..', 'backups');
       try { if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true }); } catch (err) {}
@@ -74,7 +70,7 @@ const purgePre2025 = args.includes('--purge-pre2025');
       // If no date could be parsed, conservatively skip the record
       return false;
     }
-
+// Process each fetched recall
     for (const rec of fetched) {
       try {
         // Only process recalls with a publish/recall date in 2025
@@ -152,7 +148,7 @@ const purgePre2025 = args.includes('--purge-pre2025');
         // Load all recalls and detect pre-2025 using multiple candidate fields
         const allLocals = await Recall.find({}).lean();
         const cutoffYear = 2025;
-
+// Function to determine if a recall is pre-2025 based on available date fields
         function localIsPre2025(loc) {
           const candidates = [];
           if (loc.recallDate) candidates.push(loc.recallDate);
@@ -178,7 +174,7 @@ const purgePre2025 = args.includes('--purge-pre2025');
 
         const pre2025 = allLocals.filter(localIsPre2025);
         console.log(`Detected ${pre2025.length} pre-2025 recalls to archive/purge (based on available date fields).`);
-
+// Backup and delete
         if (pre2025.length > 0) {
           const backupsDir = path.join(__dirname, '..', 'backups');
           try { if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true }); } catch (err) {}

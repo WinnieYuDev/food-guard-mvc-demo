@@ -10,7 +10,7 @@ const router = express.Router();
 const homeController = require('../controllers/home');
 const userController = require('../controllers/user');
 const { isLoggedIn } = require('../middleware/auth');
-
+// Homepage
 router.get('/', homeController.getHome);
 
 router.get('/about', (req, res) => {
@@ -41,7 +41,7 @@ router.get('/debug/my-pins', isLoggedIn, async (req, res) => {
         return res.status(500).json({ success: false, error: err && err.message });
     }
 });
-
+// Create post page
 router.get('/posts/create', (req, res) => {
     res.render('create-post', {
         title: 'Create Post - FoodGuard'

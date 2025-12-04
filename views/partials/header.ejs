@@ -19,11 +19,11 @@
                 extend: {
                     colors: {
                         usda: {
-                            blue: '#005EA2',    // USDA primary blue
-                            darkblue: '#1A4480', // USDA dark blue  
-                            red: '#E52207',      // Alert/recall red
-                            green: '#00A91C',    // Safety green
-                            gold: '#FFC72C',     // Accent gold
+                            blue: '#005EA2',  
+                            darkblue: '#1A4480', 
+                            red: '#E52207',     
+                            green: '#00A91C',    
+                            gold: '#FFC72C',     
                             gray: {
                                 50: '#F5F5F5',
                                 100: '#EDEDED',
@@ -53,20 +53,14 @@
                 
                 <div class="flex items-center">
                     <a href="/" class="flex-shrink-0 flex items-center space-x-3">
-                        
                         <img src="/imgs/logo.jpg" 
                              alt="FoodGuard Logo" 
                              class="h-10 w-auto object-contain">
-                        
-                        
-                        
-                        
                         <div>
                             <span class="text-xl font-bold text-usda-darkblue">FoodGuard</span>
                             <div class="text-xs text-usda-gray-500 -mt-1">Public Health Protection</div>
                         </div>
-                    </a>
-                    
+                    </a>    
                     <nav class="hidden md:ml-8 md:flex md:space-x-6">
                         <a href="/about" class="border-transparent text-usda-darkblue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:bg-usda-blue hover:text-white hover:border-usda-darkblue">About</a>
                         <a href="/dashboard" class="border-transparent text-usda-darkblue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:bg-usda-blue hover:text-white hover:border-usda-darkblue">Dashboard</a>
@@ -75,8 +69,6 @@
                         <a href="/posts" class="border-transparent text-usda-darkblue inline-flex items-center px-3 pt-1 border-b-2 text-sm font-medium transition-colors hover:bg-usda-blue hover:text-white hover:border-usda-darkblue">Community Forum</a>
                     </nav>
                 </div>
-                
-                
                     <div class="flex items-center space-x-4">
                     <% if (user) { %>
                         <a href="/me" class="flex items-center space-x-3 bg-usda-gray-50 px-3 py-2 rounded-lg hover:shadow-sm transition-shadow">
